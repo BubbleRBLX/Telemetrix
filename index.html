@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telemetrix Session Analyser</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans">
+
+    <div class="container mx-auto p-6">
+        <header class="mb-8 border-b border-gray-800 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+                <h1 class="text-3xl font-extrabold tracking-wider text-blue-400">TELEMETRIX SESSION ENGINE</h1>
+                <p class="text-sm text-gray-400">Upload any session array. Automatically resolves unclosed power drops.</p>
+            </div>
+            <input type="file" id="fileInput" accept=".json" class="block text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"/>
+        </header>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                <div class="text-xs font-bold text-gray-400 uppercase">Max Speed</div>
+                <div id="maxSpeed" class="text-2xl font-bold text-emerald-400">0.00 <span class="text-xs text-gray-400">km/h</span></div>
+            </div>
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                <div class="text-xs font-bold text-gray-400 uppercase">Avg Temperature</div>
+                <div id="avgTemp" class="text-2xl font-bold text-orange-400">0.0 <span class="text-xs text-gray-400">°C</span></div>
+            </div>
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                <div class="text-xs font-bold text-gray-400 uppercase">Peak Altitude</div>
+                <div id="maxAlt" class="text-2xl font-bold text-cyan-400">0.0 <span class="text-xs text-gray-400">m</span></div>
+            </div>
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                <div class="text-xs font-bold text-gray-400 uppercase">Data Entries</div>
+                <div id="totalLogs" class="text-2xl font-bold text-purple-400">0</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 bg-gray-800 p-2 rounded-xl border border-gray-700 h-[500px]">
+                <div id="map" class="w-full h-full rounded-lg"></div>
+            </div>
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 max-h-[500px] overflow-y-auto">
+                <h3 class="text-lg font-bold mb-4 text-blue-400 border-b border-gray-700 pb-2">Session Array Log</h3>
+                <div id="timeline" class="space-y-3 text-xs">
+                    <p class="text-gray-500 italic">No session active...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const map = L.map('map').setView([20, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        let pathLine = L.polyline([], {color: '#3b82f6', weight: 5}).addTo(map);
+        let startMarker, endMarker;
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                let rawText = evt.target.result.trim();
+                
+                // Self-Healing JSON Array Engine for power cuts
+                if (!rawText.endsWith("]")) {
+                    console.log("Abrupt power loss trace detected. Repairing structural string wrap...");
+                    if (rawText.endsWith(",")) {
+                        rawText = rawText.slice(0, -1); 
+                    }
+                    rawText += "]"; 
+                }
+
+                let telemetryRecords = [];
+                try {
+                    telemetryRecords = JSON.parse(rawText);
+                } catch(err) {
+                    alert("Critical parsing breakdown: The file is corrupted beyond standard string repair.");
+                    return;
+                }
+
+                let maxSpeed = 0, sumTemp = 0, maxAlt = 0;
+                let validCoordinates = [];
+
+                telemetryRecords.forEach(parsed => {
+                    if (parsed.speed > maxSpeed) maxSpeed = parsed.speed;
+                    if (parsed.alt > maxAlt) maxAlt = parsed.alt;
+                    sumTemp += parsed.temp;
+
+                    if(parsed.lat !== 0 && parsed.lng !== 0) {
+                        validCoordinates.push([parsed.lat, parsed.lng]);
+                    }
+                });
+
+                document.getElementById('totalLogs').innerText = telemetryRecords.length;
+                document.getElementById('maxSpeed').innerHTML = `${maxSpeed.toFixed(2)} <span class="text-xs text-gray-400">km/h</span>`;
+                document.getElementById('maxAlt').innerHTML = `${maxAlt.toFixed(1)} <span class="text-xs text-gray-400">m</span>`;
+                document.getElementById('avgTemp').innerHTML = `${(sumTemp / telemetryRecords.length).toFixed(1)} <span class="text-xs text-gray-400">°C</span>`;
+
+                const timelineDiv = document.getElementById('timeline');
+                timelineDiv.innerHTML = '';
+                telemetryRecords.slice().reverse().forEach(r => {
+                    const block = document.createElement('div');
+                    block.className = "p-3 bg-gray-900 border-l-4 border-cyan-500 rounded-r";
+                    block.innerHTML = `
+                        <div class="flex justify-between font-bold text-gray-300">
+                            <span>Uptime: ${r.uptime}s</span>
+                            <span class="text-emerald-400">${r.speed.toFixed(1)} km/h</span>
+                        </div>
+                        <div class="text-gray-400 mt-1">Temp: ${r.temp}°C | Heading: ${r.heading}°</div>
+                    `;
+                    timelineDiv.appendChild(block);
+                });
+
+                if(startMarker) map.removeLayer(startMarker);
+                if(endMarker) map.removeLayer(endMarker);
+
+                if(validCoordinates.length > 0) {
+                    pathLine.setLatLngs(validCoordinates);
+                    map.fitBounds(pathLine.getBounds(), {padding: [40, 40]});
+                    startMarker = L.marker(validCoordinates[0]).addTo(map).bindPopup('Origin');
+                    endMarker = L.marker(validCoordinates[validCoordinates.length - 1]).addTo(map).bindPopup('Endpoint');
+                }
+            };
+            reader.readAsText(file);
+        });
+    </script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telemetrix Session Analyser</title>
+    <title>Telemetrix Advanced Session Engine</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -14,7 +14,7 @@
         <header class="mb-8 border-b border-gray-800 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
                 <h1 class="text-3xl font-extrabold tracking-wider text-blue-400">TELEMETRIX SESSION ENGINE</h1>
-                <p class="text-sm text-gray-400">Upload any session array. Automatically resolves unclosed power drops.</p>
+                <p class="text-sm text-gray-400">Click any chronological timeline marker to inspect cross-sensor parameters.</p>
             </div>
             <input type="file" id="fileInput" accept=".json" class="block text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"/>
         </header>
@@ -39,13 +39,19 @@
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-2 bg-gray-800 p-2 rounded-xl border border-gray-700 h-[500px]">
+            <div class="lg:col-span-2 bg-gray-800 p-2 rounded-xl border border-gray-700 h-[550px] shadow-lg">
                 <div id="map" class="w-full h-full rounded-lg"></div>
             </div>
-            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 max-h-[500px] overflow-y-auto">
-                <h3 class="text-lg font-bold mb-4 text-blue-400 border-b border-gray-700 pb-2">Session Array Log</h3>
-                <div id="timeline" class="space-y-3 text-xs">
-                    <p class="text-gray-500 italic">No session active...</p>
+            
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 h-[550px] flex flex-col shadow-lg">
+                <div id="detailsCard" class="bg-gray-900 border border-gray-700 rounded-lg p-3 mb-4 shadow-inner text-xs min-h-[175px] flex flex-col justify-center transition-all duration-200">
+                    <p class="text-gray-500 italic text-center">Click any logged tracking point in the history feed below to extract telemetry snapshots and focus map tracking vectors.</p>
+                </div>
+
+                <h3 class="text-sm font-bold mb-2 text-blue-400 border-b border-gray-700 pb-2 uppercase tracking-wider">Session Chronology</h3>
+                
+                <div id="timeline" class="space-y-2 text-xs overflow-y-auto flex-1 pr-1 custom-scrollbar">
+                    <p class="text-gray-500 italic">Awaiting array streaming upload initialization...</p>
                 </div>
             </div>
         </div>
@@ -53,9 +59,13 @@
 
     <script>
         const map = L.map('map').setView([20, 0], 2);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        let pathLine = L.polyline([], {color: '#3b82f6', weight: 5}).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        let pathLine = L.polyline([], {color: '#3b82f6', weight: 5, opacity: 0.85}).addTo(map);
         let startMarker, endMarker;
+        let globalRecords = []; // Stores historical logs for structural data lookup
 
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
@@ -65,68 +75,130 @@
             reader.onload = function(evt) {
                 let rawText = evt.target.result.trim();
                 
-                // Self-Healing JSON Array Engine for power cuts
+                // Self-Healing JSON Array Engine for unexpected power dropouts
                 if (!rawText.endsWith("]")) {
-                    console.log("Abrupt power loss trace detected. Repairing structural string wrap...");
+                    console.warn("Structural interruption detected. Running stream corrections...");
                     if (rawText.endsWith(",")) {
                         rawText = rawText.slice(0, -1); 
                     }
                     rawText += "]"; 
                 }
 
-                let telemetryRecords = [];
                 try {
-                    telemetryRecords = JSON.parse(rawText);
+                    globalRecords = JSON.parse(rawText);
                 } catch(err) {
-                    alert("Critical parsing breakdown: The file is corrupted beyond standard string repair.");
+                    alert("Critical corruption: File arrays are skewed past automated structural fix constraints.");
                     return;
                 }
 
                 let maxSpeed = 0, sumTemp = 0, maxAlt = 0;
                 let validCoordinates = [];
 
-                telemetryRecords.forEach(parsed => {
+                globalRecords.forEach(parsed => {
                     if (parsed.speed > maxSpeed) maxSpeed = parsed.speed;
                     if (parsed.alt > maxAlt) maxAlt = parsed.alt;
                     sumTemp += parsed.temp;
 
-                    if(parsed.lat !== 0 && parsed.lng !== 0) {
+                    if(parsed.lat !== 0 && parsed.lng !== 0 && parsed.lat !== null && parsed.lng !== null) {
                         validCoordinates.push([parsed.lat, parsed.lng]);
                     }
                 });
 
-                document.getElementById('totalLogs').innerText = telemetryRecords.length;
+                // Update Overview Metrics
+                document.getElementById('totalLogs').innerText = globalRecords.length;
                 document.getElementById('maxSpeed').innerHTML = `${maxSpeed.toFixed(2)} <span class="text-xs text-gray-400">km/h</span>`;
                 document.getElementById('maxAlt').innerHTML = `${maxAlt.toFixed(1)} <span class="text-xs text-gray-400">m</span>`;
-                document.getElementById('avgTemp').innerHTML = `${(sumTemp / telemetryRecords.length).toFixed(1)} <span class="text-xs text-gray-400">°C</span>`;
+                document.getElementById('avgTemp').innerHTML = `${(sumTemp / globalRecords.length).toFixed(1)} <span class="text-xs text-gray-400">°C</span>`;
 
+                // Render Timeline Content
                 const timelineDiv = document.getElementById('timeline');
                 timelineDiv.innerHTML = '';
-                telemetryRecords.slice().reverse().forEach(r => {
+                
+                globalRecords.slice().reverse().forEach((r, revIndex) => {
+                    const actualIndex = globalRecords.length - 1 - revIndex;
                     const block = document.createElement('div');
-                    block.className = "p-3 bg-gray-900 border-l-4 border-cyan-500 rounded-r";
+                    block.className = "p-3 bg-gray-900 border-l-4 border-blue-500 rounded-r shadow-sm cursor-pointer hover:bg-gray-750 transition-all duration-150 timeline-item";
+                    block.setAttribute('onclick', `inspectRecordSnapshot(${actualIndex}, this)`);
                     block.innerHTML = `
-                        <div class="flex justify-between font-bold text-gray-300">
+                        <div class="flex justify-between font-bold text-gray-300 pointer-events-none">
                             <span>Uptime: ${r.uptime}s</span>
-                            <span class="text-emerald-400">${r.speed.toFixed(1)} km/h</span>
+                            <span class="text-blue-400">${r.speed ? r.speed.toFixed(1) : 0.0} km/h</span>
                         </div>
-                        <div class="text-gray-400 mt-1">Temp: ${r.temp}°C | Heading: ${r.heading}°</div>
+                        <div class="text-gray-400 text-[11px] mt-0.5 pointer-events-none">
+                            T: ${r.temp}°C | Alt: ${r.alt.toFixed(0)}m | Head: ${r.heading.toFixed(0)}°
+                        </div>
                     `;
                     timelineDiv.appendChild(block);
                 });
 
+                // Map Path Layout Modifications
                 if(startMarker) map.removeLayer(startMarker);
                 if(endMarker) map.removeLayer(endMarker);
 
                 if(validCoordinates.length > 0) {
                     pathLine.setLatLngs(validCoordinates);
                     map.fitBounds(pathLine.getBounds(), {padding: [40, 40]});
-                    startMarker = L.marker(validCoordinates[0]).addTo(map).bindPopup('Origin');
-                    endMarker = L.marker(validCoordinates[validCoordinates.length - 1]).addTo(map).bindPopup('Endpoint');
+                    startMarker = L.marker(validCoordinates[0]).addTo(map).bindPopup('<b>Journey Origin</b>');
+                    endMarker = L.marker(validCoordinates[validCoordinates.length - 1]).addTo(map).bindPopup('<b>Journey Endpoint</b>');
                 }
             };
             reader.readAsText(file);
         });
+
+        // Highlight timeline nodes and transition layout points
+        function inspectRecordSnapshot(index, element) {
+            // Revert all tracking nodes to reference structural defaults
+            document.querySelectorAll('.timeline-item').forEach(item => {
+                item.classList.remove('border-emerald-400', 'bg-gray-750');
+                item.classList.add('border-blue-500', 'bg-gray-900');
+            });
+            
+            // Apply distinct visual layout highlights to selected item
+            if(element) {
+                element.classList.remove('border-blue-500', 'bg-gray-900');
+                element.classList.add('border-emerald-400', 'bg-gray-750');
+            }
+
+            const targetRecord = globalRecords[index];
+            if(!targetRecord) return;
+
+            // Generate precise localized card structure values
+            const detailsContainer = document.getElementById('detailsCard');
+            detailsContainer.innerHTML = `
+                <div class="space-y-2 animate-fade-in">
+                    <div class="flex justify-between items-center border-b border-gray-700 pb-1.5">
+                        <span class="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Telemetry Snapshot</span>
+                        <span class="bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">Uptime: ${targetRecord.uptime}s</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px]">
+                        <div><span class="text-gray-400">Velocity:</span> <span class="font-bold text-gray-200">${targetRecord.speed ? targetRecord.speed.toFixed(2) : '0.00'} km/h</span></div>
+                        <div><span class="text-gray-400">Heading:</span> <span class="font-bold text-gray-200">${targetRecord.heading ? targetRecord.heading.toFixed(1) : '0.0'}°</span></div>
+                        <div><span class="text-gray-400">Temp / Hum:</span> <span class="font-bold text-gray-200">${targetRecord.temp}°C / ${targetRecord.hum}%</span></div>
+                        <div><span class="text-gray-400">Baro Alt:</span> <span class="font-bold text-gray-200">${targetRecord.alt.toFixed(1)} m</span></div>
+                        <div><span class="text-gray-400">GPS Alt:</span> <span class="font-bold text-gray-200">${targetRecord.gpsAlt.toFixed(1)} m</span></div>
+                        <div><span class="text-gray-400">Pressure:</span> <span class="font-bold text-gray-200">${targetRecord.press.toFixed(1)} hPa</span></div>
+                    </div>
+                    <div class="border-t border-gray-700 pt-1.5 text-[10px] space-y-0.5 text-gray-400">
+                        <div class="truncate"><span class="text-purple-400 font-semibold">IMU Accel:</span> X:${targetRecord.ax ? targetRecord.ax.toFixed(2) : '0.0'} | Y:${targetRecord.ay ? targetRecord.ay.toFixed(2) : '0.0'} | Z:${targetRecord.az ? targetRecord.az.toFixed(2) : '0.0'}</div>
+                        <div class="truncate"><span class="text-cyan-400 font-semibold">BLE Node:</span> <span class="text-gray-300">${targetRecord.ble || 'None'}</span></div>
+                        <div class="truncate font-mono text-[9px] text-gray-500 mt-1">📍 Lat: ${targetRecord.lat.toFixed(6)}, Lng: ${targetRecord.lng.toFixed(6)}</div>
+                    </div>
+                </div>
+            `;
+
+            // Glide map perspective safely onto coordinates if data checks resolve
+            if(targetRecord.lat !== 0 && targetRecord.lng !== 0 && targetRecord.lat !== null && targetRecord.lng !== null) {
+                map.flyTo([targetRecord.lat, targetRecord.lng], 16, {
+                    animate: true,
+                    duration: 1.0
+                });
+                
+                L.popup()
+                    .setLatLng([targetRecord.lat, targetRecord.lng])
+                    .setContent(`<div class="text-xs font-sans"><b>Inspected Step Marker</b><br>Uptime: ${targetRecord.uptime}s<br>Speed: ${targetRecord.speed.toFixed(1)} km/h</div>`)
+                    .openOn(map);
+            }
+        }
     </script>
 </body>
 </html>

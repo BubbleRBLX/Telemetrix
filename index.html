@@ -71,7 +71,7 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             <div class="lg:col-span-2 bg-gray-800 p-2 rounded-xl border border-gray-700 h-[550px] shadow-lg relative">
                 <div id="map" class="w-full h-full rounded-lg z-0"></div>
             </div>
@@ -84,6 +84,73 @@
                 <h3 class="text-sm font-bold mb-2 text-blue-400 border-b border-gray-700 pb-2 uppercase tracking-wider">Session Chronology</h3>
                 <div id="timeline" class="space-y-2 text-xs overflow-y-auto flex-1 pr-1">
                     <p class="text-gray-500 italic">Awaiting session trace initialization...</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-lg">
+                <h3 class="text-sm font-bold text-blue-400 mb-4 uppercase tracking-wider flex items-center gap-2">
+                    🌍 Regional Met-Station Calibration Deviation
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-gray-900 p-3 rounded-lg border border-gray-700 flex flex-col justify-between">
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Morning Temperature Variance</span>
+                            <span class="text-xs text-gray-400">Baseline Target: <b class="text-gray-200 font-mono">15.5°C</b></span>
+                        </div>
+                        <div class="mt-4 flex items-baseline justify-between">
+                            <span id="evalTempDelta" class="text-xl font-mono font-bold text-gray-500">--</span>
+                            <span id="evalTempTag" class="text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-gray-800 text-gray-400">Awaiting Data</span>
+                        </div>
+                    </div>
+                    <div class="bg-gray-900 p-3 rounded-lg border border-gray-700 flex flex-col justify-between">
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Atmospheric Humidity Delta</span>
+                            <span class="text-xs text-gray-400">Baseline Target: <b class="text-gray-200 font-mono">66.0%</b></span>
+                        </div>
+                        <div class="mt-4 flex items-baseline justify-between">
+                            <span id="evalHumDelta" class="text-xl font-mono font-bold text-gray-500">--</span>
+                            <span id="evalHumTag" class="text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-gray-800 text-gray-400">Awaiting Data</span>
+                        </div>
+                    </div>
+                    <div class="bg-gray-900 p-3 rounded-lg border border-gray-700 flex flex-col justify-between">
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Barometric Altitude Offset</span>
+                            <span class="text-xs text-gray-400">GPS Constellation Reference</span>
+                        </div>
+                        <div class="mt-4 flex items-baseline justify-between">
+                            <span id="evalAltDelta" class="text-xl font-mono font-bold text-gray-500">--</span>
+                            <span id="evalAltTag" class="text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-gray-800 text-gray-400">Awaiting Data</span>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-[11px] text-gray-400 mt-3 italic">
+                    Note: Station references map relative environmental targets against standardized atmospheric arrays for regional weather observations.
+                </p>
+            </div>
+
+            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-lg flex flex-col">
+                <h3 class="text-sm font-bold text-emerald-400 mb-3 uppercase tracking-wider">
+                    📋 Session Summary Appraisal
+                </h3>
+                <div class="bg-gray-900 border border-gray-700 rounded-lg p-4 flex-1 text-xs space-y-3 flex flex-col justify-center">
+                    <div class="flex justify-between border-b border-gray-800 pb-2">
+                        <span class="text-gray-400">Pacing Profile:</span>
+                        <span id="evalPacingProfile" class="font-bold text-gray-200">Awaiting track...</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-800 pb-2">
+                        <span class="text-gray-400">Microclimate Trajectory:</span>
+                        <span id="evalClimateProfile" class="font-bold text-gray-200">Awaiting track...</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-800 pb-2">
+                        <span class="text-gray-400">Elevation Profile Complexity:</span>
+                        <span id="evalElevationProfile" class="font-bold text-gray-200">Awaiting track...</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Sensor Signal Telemetry:</span>
+                        <span id="evalTelemetryProfile" class="font-bold text-gray-200">Awaiting track...</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -127,7 +194,6 @@
             if (activeColorMode === 'default') return '#3b82f6';
             
             if (activeColorMode === 'temp') {
-                // Shifting Bounds based on Amplify state
                 let min = isAmplified ? stats.temp.min : 10;
                 let max = isAmplified ? stats.temp.max : 35;
                 return getColorFromGradient(record.temp, min, max, {r: 59, g: 130, b: 246}, {r: 239, g: 68, b: 68});
@@ -173,7 +239,8 @@
                     alt:   { max: -Infinity, min: Infinity, sum: 0, count: 0 }
                 };
 
-                globalRecords.forEach(r => {
+                let cumulativeAltitudeDelta = 0;
+                globalRecords.forEach((r, idx) => {
                     // Update stats values logic loops
                     if (r.speed > stats.speed.max) stats.speed.max = r.speed;
                     if (r.speed < stats.speed.min) stats.speed.min = r.speed;
@@ -190,24 +257,71 @@
                     if (r.alt > stats.alt.max) stats.alt.max = r.alt;
                     if (r.alt < stats.alt.min) stats.alt.min = r.alt;
                     stats.alt.sum += r.alt; stats.alt.count++;
+
+                    if (idx > 0 && r.alt && globalRecords[idx-1].alt) {
+                        cumulativeAltitudeDelta += Math.abs(r.alt - globalRecords[idx-1].alt);
+                    }
                 });
+
+                const avgSpeed = stats.speed.sum / stats.speed.count;
+                const avgTemp = stats.temp.sum / stats.temp.count;
+                const avgHum = stats.hum.sum / stats.hum.count;
 
                 // Display Computed Mathematical Metrics inside Bounds Elements UI
                 document.getElementById('maxSpeed').innerText = stats.speed.max.toFixed(1);
-                document.getElementById('avgSpeed').innerText = (stats.speed.sum / stats.speed.count).toFixed(1);
+                document.getElementById('avgSpeed').innerText = avgSpeed.toFixed(1);
                 document.getElementById('minSpeed').innerText = stats.speed.min.toFixed(1);
 
                 document.getElementById('maxTemp').innerText = stats.temp.max.toFixed(1);
-                document.getElementById('avgTemp').innerText = (stats.temp.sum / stats.temp.count).toFixed(1);
+                document.getElementById('avgTemp').innerText = avgTemp.toFixed(1);
                 document.getElementById('minTemp').innerText = stats.temp.min.toFixed(1);
 
                 document.getElementById('maxHum').innerText = stats.hum.max.toFixed(0);
-                document.getElementById('avgHum').innerText = (stats.hum.sum / stats.hum.count).toFixed(0);
+                document.getElementById('avgHum').innerText = avgHum.toFixed(0);
                 document.getElementById('minHum').innerText = stats.hum.min.toFixed(0);
 
                 document.getElementById('maxAlt').innerText = stats.alt.max.toFixed(0);
                 document.getElementById('avgAlt').innerText = (stats.alt.sum / stats.alt.count).toFixed(0);
                 document.getElementById('minAlt').innerText = stats.alt.min.toFixed(0);
+
+                // PROCESS EVALUATIONS BOARDS CALCULATIONS (No additional JSON fields required)
+                // 1. Temp Station Comparison (Target Base: 15.5°C)
+                const tempDelta = avgTemp - 15.5;
+                document.getElementById('evalTempDelta').innerText = (tempDelta >= 0 ? '+' : '') + tempDelta.toFixed(1) + ' °C';
+                const tempTag = document.getElementById('evalTempTag');
+                if (Math.abs(tempDelta) <= 1.5) {
+                    tempTag.innerText = "Nominal"; tempTag.className = "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-emerald-500/10 text-emerald-400";
+                } else {
+                    tempTag.innerText = tempDelta > 0 ? "Thermal Deviation" : "Depressed Gradient"; tempTag.className = "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-amber-500/10 text-amber-400";
+                }
+
+                // 2. Humidity Station Comparison (Target Base: 66.0%)
+                const humDelta = avgHum - 66.0;
+                document.getElementById('evalHumDelta').innerText = (humDelta >= 0 ? '+' : '') + humDelta.toFixed(1) + '%';
+                const humTag = document.getElementById('evalHumTag');
+                if (Math.abs(humDelta) <= 8) {
+                    humTag.innerText = "Aligned"; humTag.className = "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-emerald-500/10 text-emerald-400";
+                } else {
+                    humTag.innerText = "Saturated Shift"; humTag.className = "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-cyan-500/10 text-cyan-400";
+                }
+
+                // 3. Barometric Tracking Consistency Evaluation
+                let sensorMatchCount = 0;
+                globalRecords.forEach(r => { if (r.alt && r.gpsAlt && Math.abs(r.alt - r.gpsAlt) < 1.0) sensorMatchCount++; });
+                const consistencyPct = (sensorMatchCount / globalRecords.length) * 100;
+                document.getElementById('evalAltDelta').innerText = consistencyPct.toFixed(0) + '% Match';
+                const altTag = document.getElementById('evalAltTag');
+                if (consistencyPct >= 60) {
+                    altTag.innerText = "Stable Lock"; altTag.className = "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-emerald-500/10 text-emerald-400";
+                } else {
+                    altTag.innerText = "Baro Drift"; altTag.className = "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-purple-500/10 text-purple-400";
+                }
+
+                // 4. Summary Appraisals Profile Logic
+                document.getElementById('evalPacingProfile').innerText = avgSpeed < 7 ? "Brisk Neighborhood Walk" : "Active Jogging Session";
+                document.getElementById('evalClimateProfile').innerText = (stats.temp.max - stats.temp.min) > 3 ? "Dynamic Microclimate Shift" : "Static Invariable Environment";
+                document.getElementById('evalElevationProfile').innerText = cumulativeAltitudeDelta > 20 ? "Undulating / Incline Terrain" : "Flat Plain Track";
+                document.getElementById('evalTelemetryProfile').innerText = globalRecords.some(r => r.ble) ? "Active Infrastructure Beacons Identified" : "Isolated Tracking Trace";
 
                 // Populate Historical Feed Sidebar Links
                 const timelineDiv = document.getElementById('timeline');
@@ -234,14 +348,12 @@
             reader.readAsText(file);
         });
 
-        // Split tracking records into individual visual segment steps
         function renderColorCodedMapRoutes() {
             pathSegmentsGroup.clearLayers();
             if(startMarker) map.removeLayer(startMarker);
             if(endMarker) map.removeLayer(endMarker);
 
             let validCoordinates = [];
-            
             for (let i = 0; i < globalRecords.length; i++) {
                 let current = globalRecords[i];
                 if (current.lat !== 0 && current.lng !== 0) {
@@ -251,7 +363,6 @@
 
             if (validCoordinates.length === 0) return;
 
-            // Generate trace segments connections loops
             for (let i = 0; i < validCoordinates.length - 1; i++) {
                 let nodeStart = validCoordinates[i];
                 let nodeEnd = validCoordinates[i+1];
@@ -263,7 +374,6 @@
                     opacity: 0.9
                 });
 
-                // Attach selection interaction binds down onto path map lines
                 polylineSegment.on('click', function(e) {
                     let sideElement = document.getElementById(`timeline-node-${nodeStart.index}`);
                     inspectRecordSnapshot(nodeStart.index, sideElement);
@@ -273,7 +383,6 @@
                 pathSegmentsGroup.addLayer(polylineSegment);
             }
 
-            // Standardize frame alignment configurations mapping bounds
             let simpleBoundsArray = validCoordinates.map(v => v.coords);
             let boundsPoly = L.polyline(simpleBoundsArray);
             map.fitBounds(boundsPoly.getBounds(), {padding: [40, 40]});
@@ -282,11 +391,8 @@
             endMarker = L.marker(simpleBoundsArray[simpleBoundsArray.length - 1]).addTo(map).bindPopup('Last Known Point');
         }
 
-        // Mode Toggles UI Event Handler Functions
         function changeRouteColorMode(mode) {
             activeColorMode = mode;
-            
-            // Normalize active button style colors representations UI
             ['default', 'temp', 'hum', 'speed'].forEach(m => {
                 let btn = document.getElementById(`btn-${m}`);
                 if(m === mode) {
@@ -301,7 +407,6 @@
             }
         }
 
-        // Handle Checkbox Toggles
         function toggleAmplify() {
             isAmplified = document.getElementById('amplifyBounds').checked;
             if (globalRecords.length > 0) {
@@ -344,7 +449,6 @@
 
             if(targetRecord.lat !== 0 && targetRecord.lng !== 0) {
                 map.flyTo([targetRecord.lat, targetRecord.lng], 16, { animate: true, duration: 0.8 });
-                
                 if(activeSelectionHighlight) map.removeLayer(activeSelectionHighlight);
                 
                 activeSelectionHighlight = L.circleMarker([targetRecord.lat, targetRecord.lng], {

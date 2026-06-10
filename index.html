@@ -3,153 +3,180 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telemetrix Gradient Analytics Suite</title>
+    <title>Telemetrix Quantum Gradient Analytics Suite</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen font-sans">
 
     <div class="container mx-auto p-4 lg:p-6">
-        <header class="mb-6 border-b border-gray-800 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <header class="mb-6 border-b border-gray-800 pb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-                <h1 class="text-3xl font-extrabold tracking-wider text-blue-400">TELEMETRIX GRADIENT ENGINE</h1>
-                <p class="text-sm text-gray-400">Advanced Min/Max bounds tracking with sensor-mapped route color shifts.</p>
+                <h1 class="text-3xl font-extrabold tracking-wider text-blue-400">TELEMETRIX QUANTUM ENGINE</h1>
+                <p class="text-sm text-gray-400">Advanced Client-Side Computational Physics & Multi-Screen Analysis Hub.</p>
             </div>
-            <input type="file" id="fileInput" accept=".json" class="block text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"/>
+            <div class="flex flex-wrap items-center gap-3">
+                <nav class="flex bg-gray-800 border border-gray-700 p-1 rounded-lg">
+                    <button onclick="switchTab('tab-map')" id="nav-tab-map" class="px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition bg-blue-600 text-white cursor-pointer">🗺️ Map Space</button>
+                    <button onclick="switchTab('tab-charts')" id="nav-tab-charts" class="px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition text-gray-400 hover:text-gray-200 cursor-pointer">📈 Kinetic Charts</button>
+                    <button onclick="switchTab('tab-physics')" id="nav-tab-physics" class="px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition text-gray-400 hover:text-gray-200 cursor-pointer">🌡️ Thermodynamic Lab</button>
+                </nav>
+                <input type="file" id="fileInput" accept=".json" class="block text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"/>
+            </div>
         </header>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
-                <div class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2">Speed Bounds</div>
-                <div class="grid grid-cols-3 gap-1 text-center font-mono">
-                    <div><span class="block text-[10px] text-gray-400">MAX</span><span id="maxSpeed" class="text-sm font-bold text-gray-200">0.0</span></div>
-                    <div><span class="block text-[10px] text-gray-400">AVG</span><span id="avgSpeed" class="text-sm font-bold text-gray-200">0.0</span></div>
-                    <div><span class="block text-[10px] text-gray-400">MIN</span><span id="minSpeed" class="text-sm font-bold text-gray-200">0.0</span></div>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gray-800 p-3 rounded-xl border border-gray-700 shadow-md font-mono">
+                <div class="text-[10px] font-bold text-emerald-400 uppercase">Odometer Trajectory</div>
+                <div class="text-lg font-bold mt-1 text-gray-200" id="statOdometer">0.00 km</div>
+            </div>
+            <div class="bg-gray-800 p-3 rounded-xl border border-gray-700 shadow-md font-mono">
+                <div class="text-[10px] font-bold text-orange-400 uppercase">Max Thermal Stretch</div>
+                <div class="text-lg font-bold mt-1 text-gray-200" id="statMaxTemp">0.0 °C</div>
+            </div>
+            <div class="bg-gray-800 p-3 rounded-xl border border-gray-700 shadow-md font-mono">
+                <div class="text-[10px] font-bold text-cyan-400 uppercase">Peak Heat Index</div>
+                <div class="text-lg font-bold mt-1 text-gray-200" id="statMaxHI">0.0 °C</div>
+            </div>
+            <div class="bg-gray-800 p-3 rounded-xl border border-gray-700 shadow-md font-mono">
+                <div class="text-[10px] font-bold text-purple-400 uppercase">Max Outward Tether</div>
+                <div class="text-lg font-bold mt-1 text-gray-200" id="statMaxTether">0.00 km</div>
+            </div>
+        </div>
+
+        <div id="tab-map" class="tab-content space-y-6">
+            <div class="bg-gray-800 p-3 rounded-xl border border-gray-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex flex-wrap gap-2 items-center">
+                    <span class="text-xs font-bold uppercase tracking-wider text-gray-400 mr-2">Route Gradient Layer:</span>
+                    <button onclick="changeRouteColorMode('default')" id="btn-default" class="bg-blue-600 text-white text-xs font-semibold py-1.5 px-4 rounded transition shadow">Default Blue</button>
+                    <button onclick="changeRouteColorMode('temp')" id="btn-temp" class="bg-gray-700 text-gray-200 text-xs font-semibold py-1.5 px-4 rounded transition shadow">Temperature</button>
+                    <button onclick="changeRouteColorMode('hum')" id="btn-hum" class="bg-gray-700 text-gray-200 text-xs font-semibold py-1.5 px-4 rounded transition shadow">Humidity</button>
+                    <button onclick="changeRouteColorMode('speed')" id="btn-speed" class="bg-gray-700 text-gray-200 text-xs font-semibold py-1.5 px-4 rounded transition shadow">Speed</button>
+                </div>
+                <div class="flex items-center bg-gray-900 border border-gray-700 px-3 py-1.5 rounded-lg">
+                    <input type="checkbox" id="amplifyBounds" onchange="toggleAmplify()" class="w-4 h-4 text-blue-600 bg-gray-800 border-gray-700 rounded cursor-pointer">
+                    <label for="amplifyBounds" class="ml-2 text-xs font-bold text-gray-300 cursor-pointer select-none uppercase tracking-wider">⚡ Amplify Bounds</label>
                 </div>
             </div>
-            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
-                <div class="text-xs font-bold text-orange-400 uppercase tracking-wider mb-2">Temperature (°C)</div>
-                <div class="grid grid-cols-3 gap-1 text-center font-mono">
-                    <div><span class="block text-[10px] text-gray-400">MAX</span><span id="maxTemp" class="text-sm font-bold text-gray-200">0.0</span></div>
-                    <div><span class="block text-[10px] text-gray-400">AVG</span><span id="avgTemp" class="text-sm font-bold text-gray-200">0.0</span></div>
-                    <div><span class="block text-[10px] text-gray-400">MIN</span><span id="minTemp" class="text-sm font-bold text-gray-200">0.0</span></div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-gray-800 p-2 rounded-xl border border-gray-700 h-[520px] shadow-lg relative">
+                    <div id="map" class="w-full h-full rounded-lg z-0"></div>
                 </div>
-            </div>
-            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
-                <div class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">Humidity (%)</div>
-                <div class="grid grid-cols-3 gap-1 text-center font-mono">
-                    <div><span class="block text-[10px] text-gray-400">MAX</span><span id="maxHum" class="text-sm font-bold text-gray-200">0.0</span></div>
-                    <div><span class="block text-[10px] text-gray-400">AVG</span><span id="avgHum" class="text-sm font-bold text-gray-200">0.0</span></div>
-                    <div><span class="block text-[10px] text-gray-400">MIN</span><span id="minHum" class="text-sm font-bold text-gray-200">0.0</span></div>
-                </div>
-            </div>
-            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-md">
-                <div class="text-xs font-bold text-purple-400 uppercase tracking-wider mb-2">Altitude (m)</div>
-                <div class="grid grid-cols-3 gap-1 text-center font-mono">
-                    <div><span class="block text-[10px] text-gray-400">MAX</span><span id="maxAlt" class="text-sm font-bold text-gray-200">0</span></div>
-                    <div><span class="block text-[10px] text-gray-400">AVG</span><span id="avgAlt" class="text-sm font-bold text-gray-200">0</span></div>
-                    <div><span class="block text-[10px] text-gray-400">MIN</span><span id="minAlt" class="text-sm font-bold text-gray-200">0</span></div>
+                <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 h-[520px] flex flex-col shadow-lg">
+                    <div id="detailsCard" class="bg-gray-900 border border-gray-700 rounded-lg p-3 mb-4 text-xs min-h-[175px] flex flex-col justify-center">
+                        <p class="text-gray-500 italic text-center">Load a session track and click any timeline node entry below to extract analytical metrics.</p>
+                    </div>
+                    <h3 class="text-sm font-bold mb-2 text-blue-400 border-b border-gray-700 pb-2 uppercase tracking-wider">Session Chronology</h3>
+                    <div id="timeline" class="space-y-2 text-xs overflow-y-auto flex-1 pr-1">
+                        <p class="text-gray-500 italic">Awaiting session trace initialization...</p>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="bg-gray-800 p-3 rounded-xl border border-gray-700 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div class="flex flex-wrap gap-2 items-center">
-                <span class="text-xs font-bold uppercase tracking-wider text-gray-400 mr-2">Route Color Map Overlay:</span>
-                <button onclick="changeRouteColorMode('default')" id="btn-default" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold py-1.5 px-4 rounded transition cursor-pointer shadow">Default Blue</button>
-                <button onclick="changeRouteColorMode('temp')" id="btn-temp" class="bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-semibold py-1.5 px-4 rounded transition cursor-pointer shadow">Temperature Heatmap</button>
-                <button onclick="changeRouteColorMode('hum')" id="btn-hum" class="bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-semibold py-1.5 px-4 rounded transition cursor-pointer shadow">Humidity Gradient</button>
-                <button onclick="changeRouteColorMode('speed')" id="btn-speed" class="bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-semibold py-1.5 px-4 rounded transition cursor-pointer shadow">Speed Tracker</button>
-            </div>
-            
-            <div class="flex items-center bg-gray-900 border border-gray-700 px-3 py-1.5 rounded-lg">
-                <input type="checkbox" id="amplifyBounds" onchange="toggleAmplify()" class="w-4 h-4 text-blue-600 bg-gray-800 border-gray-700 rounded focus:ring-blue-500 cursor-pointer">
-                <label for="amplifyBounds" class="ml-2 text-xs font-bold text-gray-300 cursor-pointer select-none uppercase tracking-wider">
-                    ⚡ Amplify (Dynamic Bounds)
-                </label>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <div class="lg:col-span-2 bg-gray-800 p-2 rounded-xl border border-gray-700 h-[550px] shadow-lg relative">
-                <div id="map" class="w-full h-full rounded-lg z-0"></div>
-            </div>
-            
-            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 h-[550px] flex flex-col shadow-lg">
-                <div id="detailsCard" class="bg-gray-900 border border-gray-700 rounded-lg p-3 mb-4 shadow-inner text-xs min-h-[175px] flex flex-col justify-center transition-all duration-200">
-                    <p class="text-gray-500 italic text-center">Load a session track and click any node entry below to extract analytical metrics.</p>
+        <div id="tab-charts" class="tab-content hidden space-y-4">
+            <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-lg">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-700 pb-3 mb-4">
+                    <div>
+                        <h3 class="text-sm font-bold text-blue-400 uppercase tracking-wider">📈 Kinematic Time-Series Visualization</h3>
+                        <p class="text-xs text-gray-400">Two-axis analytical data mapping profile over session timeline.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label for="chartMetricSelector" class="text-xs font-bold uppercase text-gray-400">Primary Data Vector:</label>
+                        <select id="chartMetricSelector" onchange="updateAnalyticsChart()" class="bg-gray-900 border border-gray-700 text-xs font-bold rounded p-1.5 text-gray-200 focus:outline-none focus:border-blue-500">
+                            <option value="speed">Velocity (km/h)</option>
+                            <option value="temp">Ambient Temperature (°C)</option>
+                            <option value="heatIndex">Perceived Heat Index (°C)</option>
+                            <option value="dewPoint">Calculated Dew Point (°C)</option>
+                            <option value="hum">Relative Humidity (%)</option>
+                            <option value="alt">Barometric Elevation (m)</option>
+                            <option value="airDensity">Atmospheric Air Density (kg/m³)</option>
+                            <option value="acc">Pseudo-Acceleration (m/s²)</option>
+                            <option value="vsi">Rate of Climb / VSI (m/s)</option>
+                            <option value="tether">Home Tether Radius (km)</option>
+                        </select>
+                    </div>
                 </div>
-
-                <h3 class="text-sm font-bold mb-2 text-blue-400 border-b border-gray-700 pb-2 uppercase tracking-wider">Session Chronology</h3>
-                <div id="timeline" class="space-y-2 text-xs overflow-y-auto flex-1 pr-1">
-                    <p class="text-gray-500 italic">Awaiting session trace initialization...</p>
+                <div class="h-[450px] w-full relative">
+                    <canvas id="primaryAnalyticsCanvas"></canvas>
                 </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-2 bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-lg">
-                <h3 class="text-sm font-bold text-blue-400 mb-4 uppercase tracking-wider flex items-center gap-2">
-                    🌍 Regional Met-Station Calibration Deviation
-                </h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div id="tab-physics" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-lg flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="text-xs font-extrabold uppercase text-orange-400 tracking-wider">Dew Point Profile ($T_d$)</h4>
+                            <span id="lensFogAlert" class="text-[9px] px-2 py-0.5 font-bold rounded uppercase bg-gray-900 text-gray-500">No Data</span>
+                        </div>
+                        <p class="text-xs text-gray-400 leading-relaxed">Computed using the Magnus-Tetens framework to assess thermodynamic saturation constraints across tracking points.</p>
+                    </div>
+                    <div class="mt-6 flex justify-between items-baseline font-mono">
+                        <span class="text-[10px] text-gray-400">SESSION AVG</span>
+                        <span id="labDewPoint" class="text-2xl font-bold text-gray-200">-- °C</span>
+                    </div>
+                </div>
+
+                <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-lg flex flex-col justify-between">
+                    <div>
+                        <h4 class="text-xs font-extrabold uppercase text-cyan-400 tracking-wider mb-2">Air Density Estimation ($\rho$)</h4>
+                        <p class="text-xs text-gray-400 leading-relaxed">Derived calculation executing standard dry/vapor gas constant arrays against absolute ambient barometric pressure indices.</p>
+                    </div>
+                    <div class="mt-6 flex justify-between items-baseline font-mono">
+                        <span class="text-[10px] text-gray-400">SESSION AVG</span>
+                        <span id="labAirDensity" class="text-2xl font-bold text-gray-200">-- kg/m³</span>
+                    </div>
+                </div>
+
+                <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-lg flex flex-col justify-between">
+                    <div>
+                        <h4 class="text-xs font-extrabold uppercase text-purple-400 tracking-wider mb-2">Kinetic Jerk Core Limits ($j$)</h4>
+                        <p class="text-xs text-gray-400 leading-relaxed">Measures structural change rate of acceleration ($\Delta a / \Delta t$) across linear node pacing sequences to audit structural movement shifts.</p>
+                    </div>
+                    <div class="mt-6 flex justify-between items-baseline font-mono">
+                        <span class="text-[10px] text-gray-400">MAX RECORDED JERK</span>
+                        <span id="labMaxJerk" class="text-2xl font-bold text-purple-400">-- m/s³</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-lg">
+                <h3 class="text-sm font-bold text-blue-400 mb-4 uppercase tracking-wider">🌍 Regional Calibration Station Deviation</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono">
                     <div class="bg-gray-900 p-3 rounded-lg border border-gray-700 flex flex-col justify-between">
                         <div>
-                            <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Morning Temperature Variance</span>
-                            <span class="text-xs text-gray-400">Baseline Target: <b class="text-gray-200 font-mono">15.5°C</b></span>
+                            <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Temperature Variance</span>
+                            <span class="text-xs text-gray-400">Station Baseline: <b class="text-gray-200">15.5°C</b></span>
                         </div>
                         <div class="mt-4 flex items-baseline justify-between">
-                            <span id="evalTempDelta" class="text-xl font-mono font-bold text-gray-500">--</span>
+                            <span id="evalTempDelta" class="text-xl font-bold text-gray-500">--</span>
                             <span id="evalTempTag" class="text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-gray-800 text-gray-400">Awaiting Data</span>
                         </div>
                     </div>
                     <div class="bg-gray-900 p-3 rounded-lg border border-gray-700 flex flex-col justify-between">
                         <div>
                             <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Atmospheric Humidity Delta</span>
-                            <span class="text-xs text-gray-400">Baseline Target: <b class="text-gray-200 font-mono">66.0%</b></span>
+                            <span class="text-xs text-gray-400">Station Baseline: <b class="text-gray-200">66.0%</b></span>
                         </div>
                         <div class="mt-4 flex items-baseline justify-between">
-                            <span id="evalHumDelta" class="text-xl font-mono font-bold text-gray-500">--</span>
+                            <span id="evalHumDelta" class="text-xl font-bold text-gray-500">--</span>
                             <span id="evalHumTag" class="text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-gray-800 text-gray-400">Awaiting Data</span>
                         </div>
                     </div>
                     <div class="bg-gray-900 p-3 rounded-lg border border-gray-700 flex flex-col justify-between">
                         <div>
-                            <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Barometric Altitude Offset</span>
-                            <span class="text-xs text-gray-400">GPS Constellation Reference</span>
+                            <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Barometric Sync Integrity</span>
+                            <span class="text-xs text-gray-400">GPS Constellation Cross-Reference</span>
                         </div>
                         <div class="mt-4 flex items-baseline justify-between">
-                            <span id="evalAltDelta" class="text-xl font-mono font-bold text-gray-500">--</span>
+                            <span id="evalAltDelta" class="text-xl font-bold text-gray-500">--</span>
                             <span id="evalAltTag" class="text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-gray-800 text-gray-400">Awaiting Data</span>
                         </div>
-                    </div>
-                </div>
-                <p class="text-[11px] text-gray-400 mt-3 italic">
-                    Note: Station references map relative environmental targets against standardized atmospheric arrays for regional weather observations.
-                </p>
-            </div>
-
-            <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-lg flex flex-col">
-                <h3 class="text-sm font-bold text-emerald-400 mb-3 uppercase tracking-wider">
-                    📋 Session Summary Appraisal
-                </h3>
-                <div class="bg-gray-900 border border-gray-700 rounded-lg p-4 flex-1 text-xs space-y-3 flex flex-col justify-center">
-                    <div class="flex justify-between border-b border-gray-800 pb-2">
-                        <span class="text-gray-400">Pacing Profile:</span>
-                        <span id="evalPacingProfile" class="font-bold text-gray-200">Awaiting track...</span>
-                    </div>
-                    <div class="flex justify-between border-b border-gray-800 pb-2">
-                        <span class="text-gray-400">Microclimate Trajectory:</span>
-                        <span id="evalClimateProfile" class="font-bold text-gray-200">Awaiting track...</span>
-                    </div>
-                    <div class="flex justify-between border-b border-gray-800 pb-2">
-                        <span class="text-gray-400">Elevation Profile Complexity:</span>
-                        <span id="evalElevationProfile" class="font-bold text-gray-200">Awaiting track...</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-400">Sensor Signal Telemetry:</span>
-                        <span id="evalTelemetryProfile" class="font-bold text-gray-200">Awaiting track...</span>
                     </div>
                 </div>
             </div>
@@ -158,9 +185,7 @@
 
     <script>
         const map = L.map('map').setView([20, 0], 2);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
         
         let pathSegmentsGroup = L.layerGroup().addTo(map);
         let activeSelectionHighlight = null;
@@ -169,44 +194,86 @@
         let globalRecords = []; 
         let activeColorMode = 'default';
         let isAmplified = false;
+        let timeChartInstance = null;
 
-        // Min/Max/Avg Tracker Boundaries Object Data Structures
         let stats = {
-            speed: { max: -Infinity, min: Infinity, sum: 0, count: 0 },
-            temp:  { max: -Infinity, min: Infinity, sum: 0, count: 0 },
-            hum:   { max: -Infinity, min: Infinity, sum: 0, count: 0 },
-            alt:   { max: -Infinity, min: Infinity, sum: 0, count: 0 }
+            speed: { max: -Infinity, min: Infinity, sum: 0 },
+            temp:  { max: -Infinity, min: Infinity, sum: 0 },
+            hum:   { max: -Infinity, min: Infinity, sum: 0 },
+            alt:   { max: -Infinity, min: Infinity, sum: 0 },
+            hi:    { max: -Infinity },
+            jerk:  { max: -Infinity },
+            dew:   { sum: 0 },
+            density: { sum: 0 }
         };
 
-        // Standard Linear Interpolation Scaling Helper
-        function getColorFromGradient(value, min, max, startColor, endColor) {
-            if (max === min) return `rgb(${startColor.r}, ${startColor.g}, ${startColor.b})`;
-            let fraction = Math.min(Math.max((value - min) / (max - min), 0), 1);
+        // Screen Tab Management Switch Router
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
             
-            let r = Math.round(startColor.r + fraction * (endColor.r - startColor.r));
-            let g = Math.round(startColor.g + fraction * (endColor.g - startColor.g));
-            let b = Math.round(startColor.b + fraction * (endColor.b - startColor.b));
-            return `rgb(${r}, ${g}, ${b})`;
+            // Re-render styles for navigation indicators
+            ['tab-map', 'tab-charts', 'tab-physics'].forEach(id => {
+                let btn = document.getElementById(`nav-${id}`);
+                if(id === tabId) {
+                    btn.className = "px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition bg-blue-600 text-white cursor-pointer";
+                } else {
+                    btn.className = "px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition text-gray-400 hover:text-gray-200 cursor-pointer";
+                }
+            });
+
+            // Handle Map refresh glitch when shifting from display hidden layouts
+            if(tabId === 'tab-map') { setTimeout(() => { map.invalidateSize(); }, 200); }
+            if(tabId === 'tab-charts') { updateAnalyticsChart(); }
         }
 
-        // Evaluate Segment Visual Styles based on configurations
-        function getSegmentColor(record) {
+        // Computational Thermodynamic Formulas Engines
+        function calcDewPoint(T, RH) {
+            const a = 17.27, b = 237.7;
+            let alpha = ((a * T) / (b + T)) + Math.log(RH / 100.0);
+            return (b * alpha) / (a - alpha);
+        }
+
+        function calcHeatIndex(T, RH) {
+            if (T < 26.7) return T; // Heat index is calculationally irrelevant under 26.7C baseline
+            return T + 0.5 * (T + 61.0 + ((T - 68.0) * 1.2) + (RH * 0.094));
+        }
+
+        function calcAirDensity(p_hpa, T_c) {
+            let P = p_hpa * 100; // Pa
+            let T_k = T_c + 273.15; // Kelvin
+            return P / (287.05 * T_k); // Return kg/m³ using dry air gas metric constant
+        }
+
+        function haversine(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // Earth radius in meters
+            let phi1 = lat1 * Math.PI/180, phi2 = lat2 * Math.PI/180;
+            let deltaPhi = (lat2-lat1) * Math.PI/180, deltaLambda = (lon2-lon1) * Math.PI/180;
+            let a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) + Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        // Linear Color Interpolator Shorthand
+        function getColorFromGradient(val, min, max, sCol, eCol) {
+            if (max === min) return `rgb(${sCol.r}, ${sCol.g}, ${sCol.b})`;
+            let fr = Math.min(Math.max((val - min) / (max - min), 0), 1);
+            return `rgb(${Math.round(sCol.r + fr * (eCol.r - sCol.r))}, ${Math.round(sCol.g + fr * (eCol.g - sCol.g))}, ${Math.round(sCol.b + fr * (eCol.b - sCol.b))})`;
+        }
+
+        function getSegmentColor(rec) {
             if (activeColorMode === 'default') return '#3b82f6';
-            
+            let min, max;
             if (activeColorMode === 'temp') {
-                let min = isAmplified ? stats.temp.min : 10;
-                let max = isAmplified ? stats.temp.max : 35;
-                return getColorFromGradient(record.temp, min, max, {r: 59, g: 130, b: 246}, {r: 239, g: 68, b: 68});
+                min = isAmplified ? stats.temp.min : 10; max = isAmplified ? stats.temp.max : 35;
+                return getColorFromGradient(rec.temp, min, max, {r: 59, g: 130, b: 246}, {r: 239, g: 68, b: 68});
             }
             if (activeColorMode === 'hum') {
-                let min = isAmplified ? stats.hum.min : 20;
-                let max = isAmplified ? stats.hum.max : 90;
-                return getColorFromGradient(record.hum, min, max, {r: 234, g: 179, b: 8}, {r: 13, g: 148, b: 136});
+                min = isAmplified ? stats.hum.min : 20; max = isAmplified ? stats.hum.max : 90;
+                return getColorFromGradient(rec.hum, min, max, {r: 234, g: 179, b: 8}, {r: 13, g: 148, b: 136});
             }
             if (activeColorMode === 'speed') {
-                let min = isAmplified ? stats.speed.min : 5;
-                let max = isAmplified ? stats.speed.max : 60;
-                return getColorFromGradient(record.speed, min, max, {r: 245, g: 158, b: 11}, {r: 16, g: 185, b: 129});
+                min = isAmplified ? stats.speed.min : 0; max = isAmplified ? stats.speed.max : 10;
+                return getColorFromGradient(rec.speed, min, max, {r: 245, g: 158, b: 11}, {r: 16, g: 185, b: 129});
             }
             return '#3b82f6';
         }
@@ -214,252 +281,215 @@
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = function(evt) {
-                let rawText = evt.target.result.trim();
+                let raw = evt.target.result.trim();
+                if (!raw.endsWith("]")) { if(raw.endsWith(",")) raw = raw.slice(0, -1); raw += "]"; }
+                try { globalRecords = JSON.parse(raw); } catch(err) { alert("JSON Parsing Failure."); return; }
+
+                // RESET BASEBOUNDS
+                stats = { speed: { max: -1, min: 999, sum: 0 }, temp: { max: -1, min: 999, sum: 0 }, hum: { max: -1, min: 999, sum: 0 }, alt: { max: -1, min: 999, sum: 0 }, hi: { max: -1 }, jerk: { max: -1 }, dew: { sum: 0 }, density: { sum: 0 } };
                 
-                if (!rawText.endsWith("]")) {
-                    if (rawText.endsWith(",")) rawText = rawText.slice(0, -1); 
-                    rawText += "]"; 
-                }
+                let cumulativeDistance = 0;
+                let originalLat = globalRecords[0].lat;
+                let originalLng = globalRecords[0].lng;
 
-                try {
-                    globalRecords = JSON.parse(rawText);
-                } catch(err) {
-                    alert("Parsing Error: Structured array formatting is corrupted.");
-                    return;
-                }
-
-                // Reset calculations data points objects
-                stats = {
-                    speed: { max: -Infinity, min: Infinity, sum: 0, count: 0 },
-                    temp:  { max: -Infinity, min: Infinity, sum: 0, count: 0 },
-                    hum:   { max: -Infinity, min: Infinity, sum: 0, count: 0 },
-                    alt:   { max: -Infinity, min: Infinity, sum: 0, count: 0 }
-                };
-
-                let cumulativeAltitudeDelta = 0;
+                // EDGE COMPUTE SEQUENTIAL PASS FOR EXTRA DATA VECTORS
                 globalRecords.forEach((r, idx) => {
-                    // Update stats values logic loops
-                    if (r.speed > stats.speed.max) stats.speed.max = r.speed;
-                    if (r.speed < stats.speed.min) stats.speed.min = r.speed;
-                    stats.speed.sum += r.speed; stats.speed.count++;
+                    let prev = idx > 0 ? globalRecords[idx-1] : null;
+                    let dt = prev ? (r.uptime - prev.uptime) : 5;
+                    if(dt <= 0) dt = 1;
 
-                    if (r.temp > stats.temp.max) stats.temp.max = r.temp;
-                    if (r.temp < stats.temp.min) stats.temp.min = r.temp;
-                    stats.temp.sum += r.temp; stats.temp.count++;
-
-                    if (r.hum > stats.hum.max) stats.hum.max = r.hum;
-                    if (r.hum < stats.hum.min) stats.hum.min = r.hum;
-                    stats.hum.sum += r.hum; stats.hum.count++;
-
-                    if (r.alt > stats.alt.max) stats.alt.max = r.alt;
-                    if (r.alt < stats.alt.min) stats.alt.min = r.alt;
-                    stats.alt.sum += r.alt; stats.alt.count++;
-
-                    if (idx > 0 && r.alt && globalRecords[idx-1].alt) {
-                        cumulativeAltitudeDelta += Math.abs(r.alt - globalRecords[idx-1].alt);
+                    // Derive Lab Formulas Fields directly into records matrix elements
+                    r.dewPoint = calcDewPoint(r.temp, r.hum);
+                    r.heatIndex = calcHeatIndex(r.temp, r.hum);
+                    r.airDensity = calcAirDensity(r.press || 1013.25, r.temp);
+                    
+                    if(prev) {
+                        r.acc = ((r.speed - prev.speed) / 3.6) / dt; // m/s²
+                        r.jerk = (r.acc - (prev.acc || 0)) / dt;    // m/s³
+                        r.vsi = (r.alt - prev.alt) / dt;            // m/s Rate of Climb
+                        cumulativeDistance += haversine(prev.lat, prev.lng, r.lat, r.lng);
+                    } else {
+                        r.acc = 0; r.jerk = 0; r.vsi = 0;
                     }
+                    r.odometer = cumulativeDistance / 1000.0; // convert to km
+                    r.tether = haversine(originalLat, originalLng, r.lat, r.lng) / 1000.0; // km away from origin
+
+                    // Accumulate Statistics Loop Engine bounds
+                    if (r.speed > stats.speed.max) stats.speed.max = r.speed; if (r.speed < stats.speed.min) stats.speed.min = r.speed; stats.speed.sum += r.speed;
+                    if (r.temp > stats.temp.max) stats.temp.max = r.temp; if (r.temp < stats.temp.min) stats.temp.min = r.temp; stats.temp.sum += r.temp;
+                    if (r.hum > stats.hum.max) stats.hum.max = r.hum; if (r.hum < stats.hum.min) stats.hum.min = r.hum; stats.hum.sum += r.hum;
+                    if (r.alt > stats.alt.max) stats.alt.max = r.alt; if (r.alt < stats.alt.min) stats.alt.min = r.alt; stats.alt.sum += r.alt;
+                    if (r.heatIndex > stats.hi.max) stats.hi.max = r.heatIndex;
+                    if (Math.abs(r.jerk) > stats.jerk.max) stats.jerk.max = Math.abs(r.jerk);
+                    stats.dew.sum += r.dewPoint; stats.density.sum += r.airDensity;
                 });
 
-                const avgSpeed = stats.speed.sum / stats.speed.count;
-                const avgTemp = stats.temp.sum / stats.temp.count;
-                const avgHum = stats.hum.sum / stats.hum.count;
+                let count = globalRecords.length;
 
-                // Display Computed Mathematical Metrics inside Bounds Elements UI
-                document.getElementById('maxSpeed').innerText = stats.speed.max.toFixed(1);
-                document.getElementById('avgSpeed').innerText = avgSpeed.toFixed(1);
-                document.getElementById('minSpeed').innerText = stats.speed.min.toFixed(1);
+                // Render Summary UI elements text blocks
+                document.getElementById('statOdometer').innerText = (cumulativeDistance / 1000.0).toFixed(2) + " km";
+                document.getElementById('statMaxTemp').innerText = stats.temp.max.toFixed(1) + " °C";
+                document.getElementById('statMaxHI').innerText = stats.hi.max.toFixed(1) + " °C";
+                document.getElementById('statMaxTether').innerText = Math.max(...globalRecords.map(r => r.tether)).toFixed(2) + " km";
 
-                document.getElementById('maxTemp').innerText = stats.temp.max.toFixed(1);
-                document.getElementById('avgTemp').innerText = avgTemp.toFixed(1);
-                document.getElementById('minTemp').innerText = stats.temp.min.toFixed(1);
+                // Lab panel dynamic filling variables binds
+                document.getElementById('labDewPoint').innerText = (stats.dew.sum / count).toFixed(1) + " °C";
+                document.getElementById('labAirDensity').innerText = (stats.density.sum / count).toFixed(3) + " kg/m³";
+                document.getElementById('labMaxJerk').innerText = stats.jerk.max.toFixed(2) + " m/s³";
 
-                document.getElementById('maxHum').innerText = stats.hum.max.toFixed(0);
-                document.getElementById('avgHum').innerText = avgHum.toFixed(0);
-                document.getElementById('minHum').innerText = stats.hum.min.toFixed(0);
-
-                document.getElementById('maxAlt').innerText = stats.alt.max.toFixed(0);
-                document.getElementById('avgAlt').innerText = (stats.alt.sum / stats.alt.count).toFixed(0);
-                document.getElementById('minAlt').innerText = stats.alt.min.toFixed(0);
-
-                // PROCESS EVALUATIONS BOARDS CALCULATIONS (No additional JSON fields required)
-                // 1. Temp Station Comparison (Target Base: 15.5°C)
-                const tempDelta = avgTemp - 15.5;
-                document.getElementById('evalTempDelta').innerText = (tempDelta >= 0 ? '+' : '') + tempDelta.toFixed(1) + ' °C';
-                const tempTag = document.getElementById('evalTempTag');
-                if (Math.abs(tempDelta) <= 1.5) {
-                    tempTag.innerText = "Nominal"; tempTag.className = "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-emerald-500/10 text-emerald-400";
+                // Lens Fogging alert trigger conditional evaluation logic check
+                let lastRec = globalRecords[count-1];
+                let fogAlert = document.getElementById('lensFogAlert');
+                if(Math.abs(lastRec.temp - lastRec.dewPoint) <= 2.0) {
+                    fogAlert.innerText = "🚨 HIGH CONDENSATION RISK"; fogAlert.className = "text-[9px] px-2 py-0.5 font-bold rounded uppercase bg-red-500/20 text-red-400 animation-pulse";
                 } else {
-                    tempTag.innerText = tempDelta > 0 ? "Thermal Deviation" : "Depressed Gradient"; tempTag.className = "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-amber-500/10 text-amber-400";
+                    fogAlert.innerText = "NOMINAL SATURATION"; fogAlert.className = "text-[9px] px-2 py-0.5 font-bold rounded uppercase bg-emerald-500/10 text-emerald-400";
                 }
 
-                // 2. Humidity Station Comparison (Target Base: 66.0%)
-                const humDelta = avgHum - 66.0;
-                document.getElementById('evalHumDelta').innerText = (humDelta >= 0 ? '+' : '') + humDelta.toFixed(1) + '%';
-                const humTag = document.getElementById('evalHumTag');
-                if (Math.abs(humDelta) <= 8) {
-                    humTag.innerText = "Aligned"; humTag.className = "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-emerald-500/10 text-emerald-400";
-                } else {
-                    humTag.innerText = "Saturated Shift"; humTag.className = "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-cyan-500/10 text-cyan-400";
-                }
+                // Station Delta Comparisons
+                let tDelta = (stats.temp.sum/count) - 15.5;
+                document.getElementById('evalTempDelta').innerText = (tDelta >= 0 ? '+' : '') + tDelta.toFixed(1) + ' °C';
+                document.getElementById('evalTempTag').className = Math.abs(tDelta) < 2 ? "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-emerald-500/10 text-emerald-400" : "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-amber-500/10 text-amber-400";
+                document.getElementById('evalTempTag').innerText = Math.abs(tDelta) < 2 ? "Nominal Match" : "Thermal Shift";
 
-                // 3. Barometric Tracking Consistency Evaluation
-                let sensorMatchCount = 0;
-                globalRecords.forEach(r => { if (r.alt && r.gpsAlt && Math.abs(r.alt - r.gpsAlt) < 1.0) sensorMatchCount++; });
-                const consistencyPct = (sensorMatchCount / globalRecords.length) * 100;
-                document.getElementById('evalAltDelta').innerText = consistencyPct.toFixed(0) + '% Match';
-                const altTag = document.getElementById('evalAltTag');
-                if (consistencyPct >= 60) {
-                    altTag.innerText = "Stable Lock"; altTag.className = "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-emerald-500/10 text-emerald-400";
-                } else {
-                    altTag.innerText = "Baro Drift"; altTag.className = "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-purple-500/10 text-purple-400";
-                }
-
-                // 4. Summary Appraisals Profile Logic
-                document.getElementById('evalPacingProfile').innerText = avgSpeed < 7 ? "Brisk Neighborhood Walk" : "Active Jogging Session";
-                document.getElementById('evalClimateProfile').innerText = (stats.temp.max - stats.temp.min) > 3 ? "Dynamic Microclimate Shift" : "Static Invariable Environment";
-                document.getElementById('evalElevationProfile').innerText = cumulativeAltitudeDelta > 20 ? "Undulating / Incline Terrain" : "Flat Plain Track";
-                document.getElementById('evalTelemetryProfile').innerText = globalRecords.some(r => r.ble) ? "Active Infrastructure Beacons Identified" : "Isolated Tracking Trace";
-
-                // Populate Historical Feed Sidebar Links
-                const timelineDiv = document.getElementById('timeline');
-                timelineDiv.innerHTML = '';
+                let hDelta = (stats.hum.sum/count) - 66.0;
+                document.getElementById('evalHumDelta').innerText = (hDelta >= 0 ? '+' : '') + hDelta.toFixed(1) + '%';
                 
-                globalRecords.slice().reverse().forEach((r, revIndex) => {
-                    const actualIndex = globalRecords.length - 1 - revIndex;
-                    const block = document.createElement('div');
-                    block.className = "p-3 bg-gray-900 border-l-4 border-blue-500 rounded-r cursor-pointer hover:bg-gray-750 transition-all timeline-item";
-                    block.setAttribute('onclick', `inspectRecordSnapshot(${actualIndex}, this)`);
-                    block.id = `timeline-node-${actualIndex}`;
-                    block.innerHTML = `
-                        <div class="flex justify-between font-bold text-gray-300">
-                            <span>Uptime: ${r.uptime}s</span>
-                            <span class="text-blue-400">${r.speed.toFixed(1)} km/h</span>
-                        </div>
-                        <div class="text-gray-400 text-[11px] mt-0.5">T: ${r.temp}°C | H: ${r.hum}% | A: ${r.alt.toFixed(0)}m</div>
-                    `;
-                    timelineDiv.appendChild(block);
-                });
+                let sMatch = 0; globalRecords.forEach(r => { if(Math.abs(r.alt - r.gpsAlt) < 1.5) sMatch++; });
+                document.getElementById('evalAltDelta').innerText = ((sMatch/count)*100).toFixed(0) + '% Lock';
 
+                // Re-render core items
+                populateTimelineView();
                 renderColorCodedMapRoutes();
+                if(!document.getElementById('tab-charts').classList.contains('hidden')) { updateAnalyticsChart(); }
             };
             reader.readAsText(file);
         });
 
+        function populateTimelineView() {
+            const timelineDiv = document.getElementById('timeline');
+            timelineDiv.innerHTML = '';
+            globalRecords.slice().reverse().forEach((r, rIdx) => {
+                const actIdx = globalRecords.length - 1 - rIdx;
+                const block = document.createElement('div');
+                block.className = "p-2.5 bg-gray-900 border-l-4 border-blue-500 rounded-r cursor-pointer hover:bg-gray-750 transition-all timeline-item";
+                block.setAttribute('onclick', `inspectRecordSnapshot(${actIdx}, this)`);
+                block.id = `timeline-node-${actIdx}`;
+                block.innerHTML = `
+                    <div class="flex justify-between font-bold text-gray-300">
+                        <span>Time: ${r.uptime}s</span><span>${r.speed.toFixed(1)} km/h</span>
+                    </div>
+                    <div class="text-gray-500 text-[10px] mt-0.5">Odo: ${r.odometer.toFixed(2)}km | Jerk: ${Math.abs(r.jerk).toFixed(2)} m/s³</div>
+                `;
+                timelineDiv.appendChild(block);
+            });
+        }
+
         function renderColorCodedMapRoutes() {
             pathSegmentsGroup.clearLayers();
-            if(startMarker) map.removeLayer(startMarker);
-            if(endMarker) map.removeLayer(endMarker);
+            if(startMarker) map.removeLayer(startMarker); if(endMarker) map.removeLayer(endMarker);
+            let validCoords = [];
+            globalRecords.forEach((r, i) => { if(r.lat !== 0 && r.lng !== 0) validCoords.push({coords: [r.lat, r.lng], index: i}); });
+            if(validCoords.length === 0) return;
 
-            let validCoordinates = [];
-            for (let i = 0; i < globalRecords.length; i++) {
-                let current = globalRecords[i];
-                if (current.lat !== 0 && current.lng !== 0) {
-                    validCoordinates.push({coords: [current.lat, current.lng], index: i});
-                }
-            }
-
-            if (validCoordinates.length === 0) return;
-
-            for (let i = 0; i < validCoordinates.length - 1; i++) {
-                let nodeStart = validCoordinates[i];
-                let nodeEnd = validCoordinates[i+1];
-                let recordRef = globalRecords[nodeStart.index];
-
-                let polylineSegment = L.polyline([nodeStart.coords, nodeEnd.coords], {
-                    color: getSegmentColor(recordRef),
-                    weight: 5,
-                    opacity: 0.9
+            for(let i=0; i<validCoords.length - 1; i++) {
+                let startNode = validCoords[i], endNode = validCoords[i+1];
+                let polySegment = L.polyline([startNode.coords, endNode.coords], { color: getSegmentColor(globalRecords[startNode.index]), weight: 5, opacity: 0.9 });
+                polySegment.on('click', function() {
+                    let sEl = document.getElementById(`timeline-node-${startNode.index}`);
+                    inspectRecordSnapshot(startNode.index, sEl);
+                    if(sEl) sEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 });
-
-                polylineSegment.on('click', function(e) {
-                    let sideElement = document.getElementById(`timeline-node-${nodeStart.index}`);
-                    inspectRecordSnapshot(nodeStart.index, sideElement);
-                    if(sideElement) sideElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                });
-
-                pathSegmentsGroup.addLayer(polylineSegment);
+                pathSegmentsGroup.addLayer(polySegment);
             }
-
-            let simpleBoundsArray = validCoordinates.map(v => v.coords);
-            let boundsPoly = L.polyline(simpleBoundsArray);
-            map.fitBounds(boundsPoly.getBounds(), {padding: [40, 40]});
-
-            startMarker = L.marker(simpleBoundsArray[0]).addTo(map).bindPopup('Origin');
-            endMarker = L.marker(simpleBoundsArray[simpleBoundsArray.length - 1]).addTo(map).bindPopup('Last Known Point');
+            let boundsArray = validCoords.map(v => v.coords);
+            map.fitBounds(L.polyline(boundsArray).getBounds(), { padding: [30,30] });
+            startMarker = L.marker(boundsArray[0]).addTo(map).bindPopup('Start Point');
+            endMarker = L.marker(boundsArray[boundsArray.length - 1]).addTo(map).bindPopup('Terminal Capture Point');
         }
 
-        function changeRouteColorMode(mode) {
-            activeColorMode = mode;
-            ['default', 'temp', 'hum', 'speed'].forEach(m => {
-                let btn = document.getElementById(`btn-${m}`);
-                if(m === mode) {
-                    btn.className = "bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold py-1.5 px-4 rounded transition cursor-pointer shadow";
-                } else {
-                    btn.className = "bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-semibold py-1.5 px-4 rounded transition cursor-pointer shadow";
+        function updateAnalyticsChart() {
+            if(globalRecords.length === 0) return;
+            const context = document.getElementById('primaryAnalyticsCanvas').getContext('2d');
+            const targetMetric = document.getElementById('chartMetricSelector').value;
+
+            let labels = globalRecords.map(r => `${r.uptime}s`);
+            let dataPoints = globalRecords.map(r => r[targetMetric]);
+            
+            // Map localized display names for metrics properties configurations
+            let labelMapping = { speed: "Velocity (km/h)", temp: "Ambient Temperature (°C)", heatIndex: "Heat Index (°C)", dewPoint: "Dew Point (°C)", hum: "Humidity (%)", alt: "Barometric Altitude (m)", airDensity: "Air Density (kg/m³)", acc: "Acceleration (m/s²)", vsi: "Vertical Speed (m/s)", tether: "Tether Distance (km)" };
+
+            if(timeChartInstance) { timeChartInstance.destroy(); }
+
+            timeChartInstance = new Chart(context, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: labelMapping[targetMetric],
+                        data: dataPoints,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                        borderWidth: 2.5,
+                        tension: 0.25,
+                        fill: true,
+                        pointBackgroundColor: '#10b981',
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#9ca3af', font: { weight: 'bold' } } } },
+                    scales: {
+                        x: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', maxRotation: 45 } },
+                        y: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af' } }
+                    }
                 }
             });
-
-            if (globalRecords.length > 0) {
-                renderColorCodedMapRoutes();
-            }
         }
 
-        function toggleAmplify() {
-            isAmplified = document.getElementById('amplifyBounds').checked;
-            if (globalRecords.length > 0) {
-                renderColorCodedMapRoutes();
-            }
+        function changeRouteColorMode(mode) { activeColorMode = mode; changeRouteColorModeStyles(mode); if(globalRecords.length > 0) renderColorCodedMapRoutes(); }
+        function toggleAmplify() { isAmplified = document.getElementById('amplifyBounds').checked; if(globalRecords.length > 0) renderColorCodedMapRoutes(); }
+
+        function changeRouteColorModeStyles(mode) {
+            ['default', 'temp', 'hum', 'speed'].forEach(m => {
+                document.getElementById(`btn-${m}`).className = (m === mode) ? "bg-blue-600 text-white text-xs font-semibold py-1.5 px-4 rounded transition shadow" : "bg-gray-700 text-gray-200 text-xs font-semibold py-1.5 px-4 rounded transition shadow";
+            });
         }
 
         function inspectRecordSnapshot(index, element) {
-            document.querySelectorAll('.timeline-item').forEach(item => {
-                item.classList.remove('border-emerald-400', 'bg-gray-750');
-                item.classList.add('border-blue-500', 'bg-gray-900');
-            });
-            
-            if(element) {
-                element.classList.remove('border-blue-500', 'bg-gray-900');
-                element.classList.add('border-emerald-400', 'bg-gray-750');
-            }
+            document.querySelectorAll('.timeline-item').forEach(item => { item.classList.remove('border-emerald-400', 'bg-gray-750'); item.classList.add('border-blue-500', 'bg-gray-900'); });
+            if(element) { element.classList.remove('border-blue-500', 'bg-gray-900'); element.classList.add('border-emerald-400', 'bg-gray-750'); }
 
-            const targetRecord = globalRecords[index];
-            if(!targetRecord) return;
+            const target = globalRecords[index]; if(!target) return;
 
-            const detailsContainer = document.getElementById('detailsCard');
-            detailsContainer.innerHTML = `
+            document.getElementById('detailsCard').innerHTML = `
                 <div class="space-y-2">
-                    <div class="flex justify-between items-center border-b border-gray-700 pb-1.5">
-                        <span class="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Telemetry Snapshot</span>
-                        <span class="bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full font-mono">Uptime: ${targetRecord.uptime}s</span>
+                    <div class="flex justify-between items-center border-b border-gray-700 pb-1">
+                        <span class="font-bold text-emerald-400 uppercase text-[10px]">Quantum Matrix Snapshot</span>
+                        <span class="bg-blue-500/10 text-blue-400 font-mono text-[9px] px-2 py-0.5 rounded">Uptime: ${target.uptime}s</span>
                     </div>
-                    <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px]">
-                        <div><span class="text-gray-400">Velocity:</span> <span class="font-bold text-gray-200">${targetRecord.speed.toFixed(2)} km/h</span></div>
-                        <div><span class="text-gray-400">Heading:</span> <span class="font-bold text-gray-200">${targetRecord.heading.toFixed(1)}°</span></div>
-                        <div><span class="text-gray-400">Temp / Hum:</span> <span class="font-bold text-gray-200">${targetRecord.temp}°C / ${targetRecord.hum}%</span></div>
-                        <div><span class="text-gray-400">Baro Alt:</span> <span class="font-bold text-gray-200">${targetRecord.alt.toFixed(1)} m</span></div>
-                    </div>
-                    <div class="border-t border-gray-700 pt-1.5 text-[10px] text-gray-400 truncate">
-                         <span class="text-purple-400 font-semibold">BLE Node:</span> <span class="text-gray-300">${targetRecord.ble || 'None'}</span>
+                    <div class="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[11px]">
+                        <div><span class="text-gray-400">Pacing:</span> <span class="text-gray-200 font-bold">${target.speed.toFixed(1)} km/h</span></div>
+                        <div><span class="text-gray-400">VSI Climb:</span> <span class="text-purple-400 font-bold">${target.vsi.toFixed(2)} m/s</span></div>
+                        <div><span class="text-gray-400">Thermals:</span> <span class="text-gray-200">${target.temp}°C / Apparent: ${target.heatIndex.toFixed(1)}°C</span></div>
+                        <div><span class="text-gray-400">Dew Point:</span> <span class="text-orange-400 font-bold">${target.dewPoint.toFixed(1)}°C</span></div>
+                        <div><span class="text-gray-400">Air Density:</span> <span class="text-cyan-400">${target.airDensity.toFixed(3)} kg/m³</span></div>
+                        <div><span class="text-gray-400">Home Radius:</span> <span class="text-gray-200">${target.tether.toFixed(2)} km</span></div>
                     </div>
                 </div>
             `;
 
-            if(targetRecord.lat !== 0 && targetRecord.lng !== 0) {
-                map.flyTo([targetRecord.lat, targetRecord.lng], 16, { animate: true, duration: 0.8 });
+            if(target.lat !== 0 && target.lng !== 0) {
+                map.flyTo([target.lat, target.lng], 16, { animate: true, duration: 0.5 });
                 if(activeSelectionHighlight) map.removeLayer(activeSelectionHighlight);
-                
-                activeSelectionHighlight = L.circleMarker([targetRecord.lat, targetRecord.lng], {
-                    radius: 12,
-                    color: '#10b981',
-                    weight: 3,
-                    fillColor: '#10b981',
-                    fillOpacity: 0.3
-                }).addTo(map);
+                activeSelectionHighlight = L.circleMarker([target.lat, target.lng], { radius: 10, color: '#10b981', weight: 3, fillColor: '#10b981', fillOpacity: 0.25 }).addTo(map);
             }
         }
     </script>
 </body>
 </html>
+

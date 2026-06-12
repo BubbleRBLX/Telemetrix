@@ -50,10 +50,10 @@
             <div class="bg-gray-800 p-3 rounded-xl border border-gray-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div class="flex flex-wrap gap-2 items-center">
                     <span class="text-xs font-bold uppercase tracking-wider text-gray-400 mr-2">Route Gradient Layer:</span>
-                    <button onclick="changeRouteColorMode('default')" id="btn-default" class="bg-blue-600 text-white text-xs font-semibold py-1.5 px-4 rounded transition shadow">Default Blue</button>
-                    <button onclick="changeRouteColorMode('temp')" id="btn-temp" class="bg-gray-700 text-gray-200 text-xs font-semibold py-1.5 px-4 rounded transition shadow">Temperature</button>
-                    <button onclick="changeRouteColorMode('hum')" id="btn-hum" class="bg-gray-700 text-gray-200 text-xs font-semibold py-1.5 px-4 rounded transition shadow">Humidity</button>
-                    <button onclick="changeRouteColorMode('speed')" id="btn-speed" class="bg-gray-700 text-gray-200 text-xs font-semibold py-1.5 px-4 rounded transition shadow">Speed</button>
+                    <button onclick="changeRouteColorMode('default')" id="btn-default" class="bg-blue-600 text-white text-xs font-semibold py-1.5 px-4 rounded transition shadow cursor-pointer">Default Blue</button>
+                    <button onclick="changeRouteColorMode('temp')" id="btn-temp" class="bg-gray-700 text-gray-200 text-xs font-semibold py-1.5 px-4 rounded transition shadow cursor-pointer">Temperature</button>
+                    <button onclick="changeRouteColorMode('hum')" id="btn-hum" class="bg-gray-700 text-gray-200 text-xs font-semibold py-1.5 px-4 rounded transition shadow cursor-pointer">Humidity</button>
+                    <button onclick="changeRouteColorMode('speed')" id="btn-speed" class="bg-gray-700 text-gray-200 text-xs font-semibold py-1.5 px-4 rounded transition shadow cursor-pointer">Speed</button>
                 </div>
                 <div class="flex items-center bg-gray-900 border border-gray-700 px-3 py-1.5 rounded-lg">
                     <input type="checkbox" id="amplifyBounds" onchange="toggleAmplify()" class="w-4 h-4 text-blue-600 bg-gray-800 border-gray-700 rounded cursor-pointer">
@@ -66,7 +66,7 @@
                     <div id="map" class="w-full h-full rounded-lg z-0"></div>
                 </div>
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 h-[520px] flex flex-col shadow-lg">
-                    <div id="detailsCard" class="bg-gray-900 border border-gray-700 rounded-lg p-3 mb-4 text-xs min-h-[175px] flex flex-col justify-center">
+                    <div id="detailsCard" class="bg-gray-900 border border-gray-700 rounded-lg p-3 mb-4 text-xs min-h-[190px] flex flex-col justify-center">
                         <p class="text-gray-500 italic text-center">Load a session track and click any timeline node entry below to extract analytical metrics.</p>
                     </div>
                     <h3 class="text-sm font-bold mb-2 text-blue-400 border-b border-gray-700 pb-2 uppercase tracking-wider">Session Chronology</h3>
@@ -86,13 +86,15 @@
                     </div>
                     <div class="flex items-center gap-2">
                         <label for="chartMetricSelector" class="text-xs font-bold uppercase text-gray-400">Primary Data Vector:</label>
-                        <select id="chartMetricSelector" onchange="updateAnalyticsChart()" class="bg-gray-900 border border-gray-700 text-xs font-bold rounded p-1.5 text-gray-200 focus:outline-none focus:border-blue-500">
+                        <select id="chartMetricSelector" onchange="updateAnalyticsChart()" class="bg-gray-900 border border-gray-700 text-xs font-bold rounded p-1.5 text-gray-200 focus:outline-none focus:border-blue-500 cursor-pointer">
                             <option value="speed">Velocity (km/h)</option>
+                            <option value="heading">Heading Course (°)</option>
                             <option value="temp">Ambient Temperature (°C)</option>
                             <option value="heatIndex">Perceived Heat Index (°C)</option>
                             <option value="dewPoint">Calculated Dew Point (°C)</option>
                             <option value="hum">Relative Humidity (%)</option>
-                            <option value="alt">Barometric Elevation (m)</option>
+                            <option value="baroAlt">Barometric Elevation (m)</option>
+                            <option value="gpsAlt">GPS Elevation (m)</option>
                             <option value="airDensity">Atmospheric Air Density (kg/m³)</option>
                             <option value="acc">Pseudo-Acceleration (m/s²)</option>
                             <option value="vsi">Rate of Climb / VSI (m/s)</option>
@@ -146,7 +148,7 @@
             </div>
 
             <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-lg">
-                <h3 class="text-sm font-bold text-blue-400 mb-4 uppercase tracking-wider">🌍 Regional Calibration Station Deviation</h3>
+                <h3 class="text-sm font-bold text-blue-400 mb-4 uppercase tracking-wider">🌍 Regional Calibration & Sync Deviation</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono">
                     <div class="bg-gray-900 p-3 rounded-lg border border-gray-700 flex flex-col justify-between">
                         <div>
@@ -171,7 +173,7 @@
                     <div class="bg-gray-900 p-3 rounded-lg border border-gray-700 flex flex-col justify-between">
                         <div>
                             <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">Barometric Sync Integrity</span>
-                            <span class="text-xs text-gray-400">GPS Constellation Cross-Reference</span>
+                            <span class="text-xs text-gray-400">BMP280 vs NEO-6M Alt Deviation</span>
                         </div>
                         <div class="mt-4 flex items-baseline justify-between">
                             <span id="evalAltDelta" class="text-xl font-bold text-gray-500">--</span>
@@ -197,22 +199,21 @@
         let timeChartInstance = null;
 
         let stats = {
-            speed: { max: -Infinity, min: Infinity, sum: 0 },
-            temp:  { max: -Infinity, min: Infinity, sum: 0 },
-            hum:   { max: -Infinity, min: Infinity, sum: 0 },
-            alt:   { max: -Infinity, min: Infinity, sum: 0 },
-            hi:    { max: -Infinity },
-            jerk:  { max: -Infinity },
-            dew:   { sum: 0 },
+            speed:   { max: -Infinity, min: Infinity, sum: 0 },
+            temp:    { max: -Infinity, min: Infinity, sum: 0 },
+            hum:     { max: -Infinity, min: Infinity, sum: 0 },
+            baroAlt: { max: -Infinity, min: Infinity, sum: 0 },
+            gpsAlt:  { max: -Infinity, min: Infinity, sum: 0 },
+            hi:      { max: -Infinity },
+            jerk:    { max: -Infinity },
+            dew:     { sum: 0 },
             density: { sum: 0 }
         };
 
-        // Screen Tab Management Switch Router
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById(tabId).classList.remove('hidden');
             
-            // Re-render styles for navigation indicators
             ['tab-map', 'tab-charts', 'tab-physics'].forEach(id => {
                 let btn = document.getElementById(`nav-${id}`);
                 if(id === tabId) {
@@ -222,12 +223,10 @@
                 }
             });
 
-            // Handle Map refresh glitch when shifting from display hidden layouts
             if(tabId === 'tab-map') { setTimeout(() => { map.invalidateSize(); }, 200); }
             if(tabId === 'tab-charts') { updateAnalyticsChart(); }
         }
 
-        // Computational Thermodynamic Formulas Engines
         function calcDewPoint(T, RH) {
             const a = 17.27, b = 237.7;
             let alpha = ((a * T) / (b + T)) + Math.log(RH / 100.0);
@@ -235,25 +234,24 @@
         }
 
         function calcHeatIndex(T, RH) {
-            if (T < 26.7) return T; // Heat index is calculationally irrelevant under 26.7C baseline
+            if (T < 26.7) return T;
             return T + 0.5 * (T + 61.0 + ((T - 68.0) * 1.2) + (RH * 0.094));
         }
 
         function calcAirDensity(p_hpa, T_c) {
-            let P = p_hpa * 100; // Pa
-            let T_k = T_c + 273.15; // Kelvin
-            return P / (287.05 * T_k); // Return kg/m³ using dry air gas metric constant
+            let P = p_hpa * 100;
+            let T_k = T_c + 273.15;
+            return P / (287.05 * T_k);
         }
 
         function haversine(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; // Earth radius in meters
+            const R = 6371e3;
             let phi1 = lat1 * Math.PI/180, phi2 = lat2 * Math.PI/180;
             let deltaPhi = (lat2-lat1) * Math.PI/180, deltaLambda = (lon2-lon1) * Math.PI/180;
             let a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) + Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        // Linear Color Interpolator Shorthand
         function getColorFromGradient(val, min, max, sCol, eCol) {
             if (max === min) return `rgb(${sCol.r}, ${sCol.g}, ${sCol.b})`;
             let fr = Math.min(Math.max((val - min) / (max - min), 0), 1);
@@ -284,43 +282,47 @@
             const reader = new FileReader();
             reader.onload = function(evt) {
                 let raw = evt.target.result.trim();
+                // Fix improperly closed JSON arrays (if battery died before shutdown)
                 if (!raw.endsWith("]")) { if(raw.endsWith(",")) raw = raw.slice(0, -1); raw += "]"; }
                 try { globalRecords = JSON.parse(raw); } catch(err) { alert("JSON Parsing Failure."); return; }
 
-                // RESET BASEBOUNDS
-                stats = { speed: { max: -1, min: 999, sum: 0 }, temp: { max: -1, min: 999, sum: 0 }, hum: { max: -1, min: 999, sum: 0 }, alt: { max: -1, min: 999, sum: 0 }, hi: { max: -1 }, jerk: { max: -1 }, dew: { sum: 0 }, density: { sum: 0 } };
+                stats = { speed: { max: -1, min: 999, sum: 0 }, temp: { max: -1, min: 999, sum: 0 }, hum: { max: -1, min: 999, sum: 0 }, baroAlt: { max: -1, min: 999, sum: 0 }, gpsAlt: { max: -1, min: 999, sum: 0 }, hi: { max: -1 }, jerk: { max: -1 }, dew: { sum: 0 }, density: { sum: 0 } };
                 
                 let cumulativeDistance = 0;
                 let originalLat = globalRecords[0].lat;
                 let originalLng = globalRecords[0].lng;
 
-                // EDGE COMPUTE SEQUENTIAL PASS FOR EXTRA DATA VECTORS
                 globalRecords.forEach((r, idx) => {
                     let prev = idx > 0 ? globalRecords[idx-1] : null;
                     let dt = prev ? (r.uptime - prev.uptime) : 5;
                     if(dt <= 0) dt = 1;
 
-                    // Derive Lab Formulas Fields directly into records matrix elements
+                    // Support fallback for older logs without new fields
+                    r.heading = r.heading || 0;
+                    r.fix = r.fix !== undefined ? r.fix : 1;
+                    r.baroAlt = r.baroAlt !== undefined ? r.baroAlt : (r.alt || 0);
+                    r.ble = r.ble || "UNKNOWN";
+
                     r.dewPoint = calcDewPoint(r.temp, r.hum);
                     r.heatIndex = calcHeatIndex(r.temp, r.hum);
                     r.airDensity = calcAirDensity(r.press || 1013.25, r.temp);
                     
                     if(prev) {
-                        r.acc = ((r.speed - prev.speed) / 3.6) / dt; // m/s²
-                        r.jerk = (r.acc - (prev.acc || 0)) / dt;    // m/s³
-                        r.vsi = (r.alt - prev.alt) / dt;            // m/s Rate of Climb
+                        r.acc = ((r.speed - prev.speed) / 3.6) / dt; 
+                        r.jerk = (r.acc - (prev.acc || 0)) / dt;    
+                        r.vsi = (r.baroAlt - prev.baroAlt) / dt; 
                         cumulativeDistance += haversine(prev.lat, prev.lng, r.lat, r.lng);
                     } else {
                         r.acc = 0; r.jerk = 0; r.vsi = 0;
                     }
-                    r.odometer = cumulativeDistance / 1000.0; // convert to km
-                    r.tether = haversine(originalLat, originalLng, r.lat, r.lng) / 1000.0; // km away from origin
+                    r.odometer = cumulativeDistance / 1000.0;
+                    r.tether = haversine(originalLat, originalLng, r.lat, r.lng) / 1000.0;
 
-                    // Accumulate Statistics Loop Engine bounds
                     if (r.speed > stats.speed.max) stats.speed.max = r.speed; if (r.speed < stats.speed.min) stats.speed.min = r.speed; stats.speed.sum += r.speed;
                     if (r.temp > stats.temp.max) stats.temp.max = r.temp; if (r.temp < stats.temp.min) stats.temp.min = r.temp; stats.temp.sum += r.temp;
                     if (r.hum > stats.hum.max) stats.hum.max = r.hum; if (r.hum < stats.hum.min) stats.hum.min = r.hum; stats.hum.sum += r.hum;
-                    if (r.alt > stats.alt.max) stats.alt.max = r.alt; if (r.alt < stats.alt.min) stats.alt.min = r.alt; stats.alt.sum += r.alt;
+                    if (r.baroAlt > stats.baroAlt.max) stats.baroAlt.max = r.baroAlt; if (r.baroAlt < stats.baroAlt.min) stats.baroAlt.min = r.baroAlt; stats.baroAlt.sum += r.baroAlt;
+                    if (r.gpsAlt > stats.gpsAlt.max) stats.gpsAlt.max = r.gpsAlt; if (r.gpsAlt < stats.gpsAlt.min) stats.gpsAlt.min = r.gpsAlt; stats.gpsAlt.sum += r.gpsAlt;
                     if (r.heatIndex > stats.hi.max) stats.hi.max = r.heatIndex;
                     if (Math.abs(r.jerk) > stats.jerk.max) stats.jerk.max = Math.abs(r.jerk);
                     stats.dew.sum += r.dewPoint; stats.density.sum += r.airDensity;
@@ -328,18 +330,15 @@
 
                 let count = globalRecords.length;
 
-                // Render Summary UI elements text blocks
                 document.getElementById('statOdometer').innerText = (cumulativeDistance / 1000.0).toFixed(2) + " km";
                 document.getElementById('statMaxTemp').innerText = stats.temp.max.toFixed(1) + " °C";
                 document.getElementById('statMaxHI').innerText = stats.hi.max.toFixed(1) + " °C";
                 document.getElementById('statMaxTether').innerText = Math.max(...globalRecords.map(r => r.tether)).toFixed(2) + " km";
 
-                // Lab panel dynamic filling variables binds
                 document.getElementById('labDewPoint').innerText = (stats.dew.sum / count).toFixed(1) + " °C";
                 document.getElementById('labAirDensity').innerText = (stats.density.sum / count).toFixed(3) + " kg/m³";
                 document.getElementById('labMaxJerk').innerText = stats.jerk.max.toFixed(2) + " m/s³";
 
-                // Lens Fogging alert trigger conditional evaluation logic check
                 let lastRec = globalRecords[count-1];
                 let fogAlert = document.getElementById('lensFogAlert');
                 if(Math.abs(lastRec.temp - lastRec.dewPoint) <= 2.0) {
@@ -348,7 +347,6 @@
                     fogAlert.innerText = "NOMINAL SATURATION"; fogAlert.className = "text-[9px] px-2 py-0.5 font-bold rounded uppercase bg-emerald-500/10 text-emerald-400";
                 }
 
-                // Station Delta Comparisons
                 let tDelta = (stats.temp.sum/count) - 15.5;
                 document.getElementById('evalTempDelta').innerText = (tDelta >= 0 ? '+' : '') + tDelta.toFixed(1) + ' °C';
                 document.getElementById('evalTempTag').className = Math.abs(tDelta) < 2 ? "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-emerald-500/10 text-emerald-400" : "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-amber-500/10 text-amber-400";
@@ -357,10 +355,14 @@
                 let hDelta = (stats.hum.sum/count) - 66.0;
                 document.getElementById('evalHumDelta').innerText = (hDelta >= 0 ? '+' : '') + hDelta.toFixed(1) + '%';
                 
-                let sMatch = 0; globalRecords.forEach(r => { if(Math.abs(r.alt - r.gpsAlt) < 1.5) sMatch++; });
-                document.getElementById('evalAltDelta').innerText = ((sMatch/count)*100).toFixed(0) + '% Lock';
+                // Compare explicit Baro vs GPS alt logic
+                let altDeviations = 0; 
+                globalRecords.forEach(r => { altDeviations += Math.abs(r.baroAlt - r.gpsAlt); });
+                let avgAltDev = altDeviations / count;
+                document.getElementById('evalAltDelta').innerText = '±' + avgAltDev.toFixed(1) + 'm';
+                document.getElementById('evalAltTag').innerText = avgAltDev < 10 ? "Tight Coupling" : "High Variance";
+                document.getElementById('evalAltTag').className = avgAltDev < 10 ? "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-emerald-500/10 text-emerald-400" : "text-[9px] px-2 py-0.5 rounded uppercase font-bold bg-amber-500/10 text-amber-400";
 
-                // Re-render core items
                 populateTimelineView();
                 renderColorCodedMapRoutes();
                 if(!document.getElementById('tab-charts').classList.contains('hidden')) { updateAnalyticsChart(); }
@@ -374,14 +376,20 @@
             globalRecords.slice().reverse().forEach((r, rIdx) => {
                 const actIdx = globalRecords.length - 1 - rIdx;
                 const block = document.createElement('div');
+                
+                let fixDot = r.fix ? `<span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1" title="3D GPS Fix"></span>` : `<span class="inline-block w-2 h-2 rounded-full bg-red-500 mr-1" title="Searching Satellites"></span>`;
+
                 block.className = "p-2.5 bg-gray-900 border-l-4 border-blue-500 rounded-r cursor-pointer hover:bg-gray-750 transition-all timeline-item";
                 block.setAttribute('onclick', `inspectRecordSnapshot(${actIdx}, this)`);
                 block.id = `timeline-node-${actIdx}`;
                 block.innerHTML = `
-                    <div class="flex justify-between font-bold text-gray-300">
-                        <span>Time: ${r.uptime}s</span><span>${r.speed.toFixed(1)} km/h</span>
+                    <div class="flex justify-between items-center font-bold text-gray-300">
+                        <span>${fixDot} Time: ${r.uptime}s</span><span>${r.speed.toFixed(1)} km/h</span>
                     </div>
-                    <div class="text-gray-500 text-[10px] mt-0.5">Odo: ${r.odometer.toFixed(2)}km | Jerk: ${Math.abs(r.jerk).toFixed(2)} m/s³</div>
+                    <div class="text-gray-500 text-[10px] mt-0.5 flex justify-between">
+                        <span>Odo: ${r.odometer.toFixed(2)}km</span>
+                        <span>HDG: ${r.heading.toFixed(0)}°</span>
+                    </div>
                 `;
                 timelineDiv.appendChild(block);
             });
@@ -418,8 +426,7 @@
             let labels = globalRecords.map(r => `${r.uptime}s`);
             let dataPoints = globalRecords.map(r => r[targetMetric]);
             
-            // Map localized display names for metrics properties configurations
-            let labelMapping = { speed: "Velocity (km/h)", temp: "Ambient Temperature (°C)", heatIndex: "Heat Index (°C)", dewPoint: "Dew Point (°C)", hum: "Humidity (%)", alt: "Barometric Altitude (m)", airDensity: "Air Density (kg/m³)", acc: "Acceleration (m/s²)", vsi: "Vertical Speed (m/s)", tether: "Tether Distance (km)" };
+            let labelMapping = { speed: "Velocity (km/h)", heading: "Heading (°)", temp: "Ambient Temperature (°C)", heatIndex: "Heat Index (°C)", dewPoint: "Dew Point (°C)", hum: "Humidity (%)", baroAlt: "Barometric Altitude (m)", gpsAlt: "GPS Altitude (m)", airDensity: "Air Density (kg/m³)", acc: "Acceleration (m/s²)", vsi: "Vertical Speed (m/s)", tether: "Tether Distance (km)" };
 
             if(timeChartInstance) { timeChartInstance.destroy(); }
 
@@ -465,20 +472,30 @@
             if(element) { element.classList.remove('border-blue-500', 'bg-gray-900'); element.classList.add('border-emerald-400', 'bg-gray-750'); }
 
             const target = globalRecords[index]; if(!target) return;
+            
+            let fixBadge = target.fix ? `<span class="bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded">3D LOCK</span>` : `<span class="bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded">NO FIX</span>`;
 
             document.getElementById('detailsCard').innerHTML = `
                 <div class="space-y-2">
                     <div class="flex justify-between items-center border-b border-gray-700 pb-1">
                         <span class="font-bold text-emerald-400 uppercase text-[10px]">Quantum Matrix Snapshot</span>
-                        <span class="bg-blue-500/10 text-blue-400 font-mono text-[9px] px-2 py-0.5 rounded">Uptime: ${target.uptime}s</span>
+                        <div class="flex gap-1 text-[9px] font-mono">
+                            ${fixBadge}
+                            <span class="bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded" title="BLE Status">${target.ble}</span>
+                        </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[11px]">
+                    <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 font-mono text-[11px] pt-1">
                         <div><span class="text-gray-400">Pacing:</span> <span class="text-gray-200 font-bold">${target.speed.toFixed(1)} km/h</span></div>
-                        <div><span class="text-gray-400">VSI Climb:</span> <span class="text-purple-400 font-bold">${target.vsi.toFixed(2)} m/s</span></div>
-                        <div><span class="text-gray-400">Thermals:</span> <span class="text-gray-200">${target.temp}°C / Apparent: ${target.heatIndex.toFixed(1)}°C</span></div>
+                        <div><span class="text-gray-400">Heading:</span> <span class="text-gray-200">${target.heading.toFixed(0)}°</span></div>
+                        
+                        <div><span class="text-gray-400">Baro Alt:</span> <span class="text-cyan-400 font-bold">${target.baroAlt.toFixed(1)} m</span></div>
+                        <div><span class="text-gray-400">GPS Alt:</span> <span class="text-gray-200">${target.gpsAlt.toFixed(1)} m</span></div>
+                        
+                        <div><span class="text-gray-400">Thermals:</span> <span class="text-gray-200">${target.temp}°C</span></div>
                         <div><span class="text-gray-400">Dew Point:</span> <span class="text-orange-400 font-bold">${target.dewPoint.toFixed(1)}°C</span></div>
-                        <div><span class="text-gray-400">Air Density:</span> <span class="text-cyan-400">${target.airDensity.toFixed(3)} kg/m³</span></div>
-                        <div><span class="text-gray-400">Home Radius:</span> <span class="text-gray-200">${target.tether.toFixed(2)} km</span></div>
+                        
+                        <div><span class="text-gray-400">Density:</span> <span class="text-gray-200">${target.airDensity.toFixed(3)} kg/m³</span></div>
+                        <div><span class="text-gray-400">Radius:</span> <span class="text-gray-200">${target.tether.toFixed(2)} km</span></div>
                     </div>
                 </div>
             `;
@@ -492,4 +509,3 @@
     </script>
 </body>
 </html>
-

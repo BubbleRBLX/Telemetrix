@@ -531,26 +531,34 @@
             let element = document.getElementById(`timeline-node-${index}`);
             if(element) { element.classList.add('bg-green-800', 'text-black'); }
 
-            const target = globalRecords[index]; if(!target) return;
-            const heading = target.heading || 0; // Wenn heading fehlt, nimm 0
-            const dewPoint = target.dewPoint || 0;
+            const target = globalRecords[index]; 
+            if(!target) return;
+
+            // --- SICHERHEITS-CHECK: Felder mit Fallback auf 0 ---
+            const fix = target.fix || 0;
+            const speed = target.speed || 0;
+            const heading = target.heading || 0;
+            const baroAlt = target.baroAlt || 0;
+            const temp = target.temp || 0;
             const vaporPress = target.vaporPress || 0;
-            let fixStr = target.fix ? `LOCKED` : `SEEKING`;
+            const dewPoint = target.dewPoint || 0;
+            
+            let fixStr = fix ? `LOCKED` : `SEEKING`;
             
             document.getElementById('detailsCard').innerHTML = `
                 <div class="flex justify-between border-b border-green-800 pb-1 mb-2 text-green-400">
                     <span>> INDEX: 0x${index.toString(16).toUpperCase().padStart(4, '0')}</span>
-                    <span>T+${target.uptime}s</span>
+                    <span>T+${target.uptime || 0}s</span>
                 </div>
                 <div class="grid grid-cols-2 gap-y-1">
-                    <div>GPS_FIX: <span class="${target.fix ? 'text-green-500' : 'text-red-500 blink'}">${fixStr}</span></div>
-                    <div>BLE_SYS: <span>${target.ble}</span></div>
-                    <div>VELOCITY: <span class="text-green-300">${target.speed.toFixed(1)}kph</span></div>
-                    <div>HEADING: <span>${target.heading.toFixed(0)}°</span></div>
-                    <div>B_ALT: <span class="text-green-300">${target.baroAlt.toFixed(1)}m</span></div>
-                    <div>TEMP: <span>${target.temp.toFixed(1)}°C</span></div>
-                    <div>VAPOR_P: <span>${target.vaporPress.toFixed(1)}hPa</span></div>
-                    <div>DEW_PT: <span>${target.dewPoint.toFixed(1)}°C</span></div>
+                    <div>GPS_FIX: <span class="${fix ? 'text-green-500' : 'text-red-500 blink'}">${fixStr}</span></div>
+                    <div>BLE_SYS: <span>${target.ble || 'N/A'}</span></div>
+                    <div>VELOCITY: <span class="text-green-300">${speed.toFixed(1)}kph</span></div>
+                    <div>HEADING: <span>${heading.toFixed(0)}°</span></div>
+                    <div>B_ALT: <span class="text-green-300">${baroAlt.toFixed(1)}m</span></div>
+                    <div>TEMP: <span>${temp.toFixed(1)}°C</span></div>
+                    <div>VAPOR_P: <span>${vaporPress.toFixed(1)}hPa</span></div>
+                    <div>DEW_PT: <span>${dewPoint.toFixed(1)}°C</span></div>
                 </div>
             `;
 

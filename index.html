@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TELEMETRIX // CORE</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <title>TELEMETRIX // CORE LIVE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* Custom CRT & Hacker Typography overrides */
         body { background-color: #050505; color: #16a34a; font-family: 'Courier New', Courier, monospace; }
         .crt-border { border: 1px solid #15803d; box-shadow: 0 0 8px rgba(21, 128, 61, 0.2); }
         .crt-text { text-shadow: 0 0 5px rgba(34, 197, 94, 0.5); }
@@ -18,14 +17,10 @@
         .hover-invert:hover { background-color: #22c55e; color: #000; font-weight: bold; cursor: pointer; }
         .blink { animation: blinker 1s linear infinite; }
         @keyframes blinker { 50% { opacity: 0; } }
-        
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #15803d; }
         ::-webkit-scrollbar-thumb { background: #15803d; }
         ::-webkit-scrollbar-thumb:hover { background: #22c55e; }
-
-        /* Leaflet Dark Mode Overrides */
         .leaflet-container { background: #000 !important; }
         .leaflet-popup-content-wrapper { background: #000; color: #4ade80; border: 1px solid #15803d; border-radius: 0; font-family: 'Courier New', Courier, monospace; }
         .leaflet-popup-tip { background: #000; border: 1px solid #15803d; }
@@ -38,27 +33,23 @@
             <div class="crt-border p-4 bg-black flex flex-col justify-between">
                 <div>
                     <h1 class="text-2xl font-black tracking-widest text-green-500 crt-text">SYS.TELEMETRIX<span class="blink">_</span></h1>
-                    <p class="text-[10px] text-green-700 uppercase mt-1">Quantum Gradient Analytics Hub v2.5</p>
+                    <p class="text-[10px] text-green-700 uppercase mt-1">Live WebSocket Uplink v3.0</p>
                 </div>
-                <div class="mt-4 flex flex-wrap gap-2">
-                    <label class="hover-invert border border-green-700 px-3 py-1 text-xs uppercase inline-block">
-                        [ MOUNT_DRIVE ]
-                        <input type="file" id="fileInput" accept=".json" class="hidden"/>
-                    </label>
-                    <button onclick="location.reload()" class="hover-invert border border-green-700 px-3 py-1 text-xs uppercase">[ SYS_REBOOT ]</button>
+                <div class="mt-4 flex flex-wrap gap-2 items-center">
+                    <input type="text" id="ws-ip" placeholder="192.168.X.X" class="term-input px-2 py-1 text-xs w-32" />
+                    <button onclick="connectLiveStream()" class="hover-invert border border-green-700 px-3 py-1 text-xs uppercase">[ CONNECT_STREAM ]</button>
                     <button onclick="dumpMemory()" class="hover-invert border border-green-700 px-3 py-1 text-xs uppercase text-green-800" id="btn-dump" disabled>[ DUMP_MEM ]</button>
-                    <button onclick="pingNodes()" class="hover-invert border border-green-700 px-3 py-1 text-xs uppercase">[ PING_NODES ]</button>
                 </div>
             </div>
 
             <div class="lg:col-span-2 crt-border bg-black p-2 flex flex-col h-32 relative overflow-hidden">
                 <div class="text-[10px] bg-green-900/30 text-green-400 px-2 py-0.5 border-b border-green-800 uppercase flex justify-between">
                     <span>> DATA_INTEGRITY_MATRIX</span>
-                    <span>PORT: 8080 // SECURE</span>
+                    <span id="ws-status" class="text-red-500">OFFLINE</span>
                 </div>
                 <div id="terminal-out" class="text-[10px] mt-1 overflow-y-auto flex-1 leading-tight text-green-500 p-1">
                     > INITIATING KERNEL... OK<br>
-                    > WAITING FOR JSON PAYLOAD DROP...<br>
+                    > ENTER ESP32 LOCAL IP TO BEGIN STREAM.<br>
                 </div>
             </div>
         </header>
@@ -99,29 +90,19 @@
                     <button onclick="changeRouteColorMode('speed')" id="btn-speed" class="border border-green-800 text-green-600 px-2 py-1 hover-invert">[ SPD ]</button>
                     <button onclick="changeRouteColorMode('incline')" id="btn-incline" class="border border-green-800 text-green-600 px-2 py-1 hover-invert">[ INC ]</button>
                 </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-green-700">> OVERRIDE:</span>
-                    <input type="checkbox" id="amplifyBounds" onchange="toggleAmplify()" class="accent-green-600 w-3 h-3 cursor-pointer">
-                    <label for="amplifyBounds" class="text-green-500 cursor-pointer uppercase">AMP_BOUNDS</label>
-                </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
                 <div class="lg:col-span-3 crt-border bg-black h-[550px] relative p-1">
-                    <div class="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%] z-50 opacity-20"></div>
                     <div id="map" class="w-full h-full z-0 filter contrast-125"></div>
                 </div>
                 
                 <div class="crt-border bg-black flex flex-col h-[550px]">
-                    <div class="bg-green-900/20 p-2 border-b border-green-800 text-[10px] uppercase text-green-400">
-                        > PACKET_INSPECTOR
-                    </div>
+                    <div class="bg-green-900/20 p-2 border-b border-green-800 text-[10px] uppercase text-green-400">> PACKET_INSPECTOR</div>
                     <div id="detailsCard" class="p-3 text-[10px] border-b border-green-800 min-h-[180px]">
-                        <span class="text-green-800 blink">> AWAITING_SELECTION...</span>
+                        <span class="text-green-800 blink">> AWAITING_STREAM...</span>
                     </div>
-                    <div class="bg-green-900/20 p-1 border-b border-green-800 text-[10px] uppercase pl-2 text-green-600">
-                        > CHRONO_STREAM
-                    </div>
+                    <div class="bg-green-900/20 p-1 border-b border-green-800 text-[10px] uppercase pl-2 text-green-600">> CHRONO_STREAM</div>
                     <div id="timeline" class="flex-1 overflow-y-auto p-1 space-y-1 text-[10px]"></div>
                 </div>
             </div>
@@ -135,19 +116,10 @@
                         <label class="text-green-700">> VECTOR:</label>
                         <select id="chartMetricSelector" onchange="updateAnalyticsChart()" class="term-input p-1 text-[10px] uppercase cursor-pointer">
                             <option value="speed">Velocity (KPH)</option>
-                            <option value="pace">Pace (Min/KM)</option>
-                            <option value="incline">Topo Incline (%)</option>
-                            <option value="heading">Heading (DEG)</option>
                             <option value="temp">Temp (C)</option>
-                            <option value="dewPoint">Dew Point (C)</option>
-                            <option value="hum">Rel Humidity (%)</option>
-                            <option value="absHum">Abs Humidity (g/m³)</option>
-                            <option value="vaporPress">Vapor Pressure (hPa)</option>
                             <option value="baroAlt">Baro Alt (M)</option>
-                            <option value="gpsAlt">GPS Alt (M)</option>
-                            <option value="airDensity">Air Dens (KG/M³)</option>
-                            <option value="acc">Accel (M/S²)</option>
-                            <option value="coriolis">Coriolis Force (10^-5/s)</option>
+                            <option value="hum">Rel Humidity (%)</option>
+                            <option value="vaporPress">Vapor Pressure (hPa)</option>
                         </select>
                     </div>
                 </div>
@@ -165,7 +137,7 @@
                         <span id="lensFogAlert" class="text-[9px] px-1 bg-green-900/50 text-green-700">NULL</span>
                     </div>
                     <div class="mt-4 flex justify-between items-end">
-                        <span class="text-[9px] text-green-800 uppercase">SYS_AVG</span>
+                        <span class="text-[9px] text-green-800 uppercase">CURRENT</span>
                         <span id="labDewPoint" class="text-xl text-green-400 crt-text">--</span>
                     </div>
                 </div>
@@ -175,7 +147,7 @@
                         <span class="text-[10px] uppercase text-green-600">> AIR_DENSITY_EST</span>
                     </div>
                     <div class="mt-4 flex justify-between items-end">
-                        <span class="text-[9px] text-green-800 uppercase">SYS_AVG</span>
+                        <span class="text-[9px] text-green-800 uppercase">CURRENT</span>
                         <span id="labAirDensity" class="text-xl text-green-400 crt-text">--</span>
                     </div>
                 </div>
@@ -194,7 +166,6 @@
 
         <div id="tab-deep" class="tab-content hidden space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
                 <div class="crt-border bg-black p-4">
                     <h3 class="text-green-500 font-bold border-b border-green-800 pb-2 mb-4 uppercase">> ESOTERIC_AERODYNAMICS</h3>
                     <div class="space-y-4">
@@ -225,7 +196,6 @@
                         <div>
                             <div class="text-[10px] text-green-700 mb-1">CORIOLIS FORCE PARAMETER (f)</div>
                             <div class="text-lg text-green-400 font-mono" id="deepCoriolis">--</div>
-                            <div class="text-[8px] text-green-800 mt-1">Calculated planetary rotation stress at current node latitude.</div>
                         </div>
                         <div>
                             <div class="text-[10px] text-green-700 mb-1">DISTANCE TO EQUATOR</div>
@@ -234,18 +204,16 @@
                         <div>
                             <div class="text-[10px] text-green-700 mb-1">MAX TOPOGRAPHIC INCLINE / GRADE</div>
                             <div class="text-lg text-green-400 font-mono" id="deepIncline">-- %</div>
-                            <div class="text-[8px] text-green-800 mt-1">Maximum grade calculated via Alt/Dist delta.</div>
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
 
     </div>
 
     <script>
-        // Init Map with Dark Matter Tiles
+        // Init Map
         const map = L.map('map', { zoomControl: false }).setView([20, 0], 2);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { 
             attribution: '© OpenStreetMap, © CartoDB', maxZoom: 20
@@ -257,16 +225,19 @@
         
         let globalRecords = []; 
         let activeColorMode = 'default';
-        let isAmplified = false;
         let timeChartInstance = null;
+        let wsSocket = null;
+
+        // Cumulative State Variables
+        let cumulativeDistance = 0;
+        let originalLat = null;
+        let originalLng = null;
+        let maxTether = 0;
 
         let stats = {
-            speed: { max: -Infinity, min: Infinity, sum: 0 }, temp: { max: -Infinity, min: Infinity, sum: 0 },
-            hum: { max: -Infinity, min: Infinity, sum: 0 }, baroAlt: { max: -Infinity, min: Infinity, sum: 0 },
-            gpsAlt: { max: -Infinity, min: Infinity, sum: 0 }, hi: { max: -Infinity }, jerk: { max: -Infinity },
-            incline: { max: -Infinity },
-            dew: { sum: 0 }, density: { sum: 0 }, vapor: { sum: 0 }, absHum: { sum: 0 },
-            boiling: { sum: 0 }, equatorDist: { sum: 0 }, coriolis: { sum: 0 }
+            speed: { max: -Infinity, min: Infinity }, temp: { max: -Infinity, min: Infinity },
+            hum: { max: -Infinity, min: Infinity }, baroAlt: { max: -Infinity, min: Infinity },
+            hi: { max: -Infinity }, jerk: { max: -Infinity }, incline: { max: -Infinity }
         };
 
         function termLog(msg, type="info") {
@@ -282,11 +253,9 @@
             
             ['tab-map', 'tab-charts', 'tab-physics', 'tab-deep'].forEach(id => {
                 let btn = document.getElementById(`nav-${id}`);
-                if(id === tabId) {
-                    btn.className = "px-4 py-2 hover-invert bg-green-900/40 border-t border-l border-r border-green-500 text-green-400 whitespace-nowrap";
-                } else {
-                    btn.className = "px-4 py-2 hover-invert text-green-700 border-b border-green-800 whitespace-nowrap";
-                }
+                btn.className = (id === tabId) 
+                    ? "px-4 py-2 hover-invert bg-green-900/40 border-t border-l border-r border-green-500 text-green-400 whitespace-nowrap"
+                    : "px-4 py-2 hover-invert text-green-700 border-b border-green-800 whitespace-nowrap";
             });
 
             if(tabId === 'tab-map') { setTimeout(() => { map.invalidateSize(); }, 200); }
@@ -297,13 +266,11 @@
         function calcDewPoint(T, RH) { const a = 17.27, b = 237.7; let alpha = ((a * T) / (b + T)) + Math.log(RH / 100.0); return (b * alpha) / (a - alpha); }
         function calcHeatIndex(T, RH) { if (T < 26.7) return T; return T + 0.5 * (T + 61.0 + ((T - 68.0) * 1.2) + (RH * 0.094)); }
         function calcAirDensity(p_hpa, T_c) { return (p_hpa * 100) / (287.05 * (T_c + 273.15)); }
-        
-        // NEW MATH
         function calcVaporPressure(T, RH) { return 6.11 * Math.pow(10, (7.5 * T) / (237.3 + T)) * (RH / 100.0); }
-        function calcAbsoluteHumidity(T, RH) { let e = calcVaporPressure(T, RH); return (e * 100) / (461.5 * (T + 273.15)) * 1000; } // g/m3
-        function calcBoilingPoint(alt_m) { return 100 - (alt_m / 285.0); } // Roughly drops 1C per 285m
+        function calcAbsoluteHumidity(T, RH) { let e = calcVaporPressure(T, RH); return (e * 100) / (461.5 * (T + 273.15)) * 1000; }
+        function calcBoilingPoint(alt_m) { return 100 - (alt_m / 285.0); }
         function calcCoriolis(lat) { return 2 * 7.2921e-5 * Math.sin(lat * Math.PI / 180); }
-        function distToEquator(lat) { return Math.abs(lat) * 111.32; } // Roughly 111.32 km per degree of lat
+        function distToEquator(lat) { return Math.abs(lat) * 111.32; }
 
         function haversine(lat1, lon1, lat2, lon2) {
             const R = 6371e3; let p1 = lat1 * Math.PI/180, p2 = lat2 * Math.PI/180;
@@ -312,197 +279,162 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
+        // --- LIVE WEB SOCKET INTEGRATION ---
+        function connectLiveStream() {
+            let ip = document.getElementById('ws-ip').value.trim();
+            if(!ip) { termLog("ERR: INVALID IP FORMAT", "err"); return; }
+            
+            if(wsSocket) { wsSocket.close(); }
+            
+            let wsUrl = `ws://${ip}/ws`;
+            termLog(`ATTEMPTING HANDSHAKE WITH ${wsUrl}...`);
+            
+            wsSocket = new WebSocket(wsUrl);
+            
+            wsSocket.onopen = function() {
+                document.getElementById('ws-status').innerText = "ONLINE";
+                document.getElementById('ws-status').className = "text-green-500 blink";
+                document.getElementById('btn-dump').disabled = false;
+                document.getElementById('btn-dump').classList.replace('text-green-800', 'text-green-400');
+                termLog("HANDSHAKE SUCCESS. RECEIVING LIVE DATA.");
+            };
+            
+            wsSocket.onmessage = function(event) {
+                try {
+                    let record = JSON.parse(event.data);
+                    processLiveRecord(record);
+                } catch(e) {
+                    termLog("ERR: MALFORMED JSON PACKET", "warn");
+                }
+            };
+            
+            wsSocket.onerror = function() { termLog("WS_ERROR: CONNECTION REFUSED", "err"); };
+            wsSocket.onclose = function() {
+                document.getElementById('ws-status').innerText = "OFFLINE";
+                document.getElementById('ws-status').className = "text-red-500";
+                termLog("WS_CLOSED: STREAM TERMINATED", "warn");
+            };
+        }
+
+        function processLiveRecord(r) {
+            let prev = globalRecords.length > 0 ? globalRecords[globalRecords.length-1] : null;
+            let dt = prev ? (r.uptime - prev.uptime) : 1; if(dt <= 0) dt = 1;
+
+            if(!originalLat && r.lat !== 0) { originalLat = r.lat; originalLng = r.lng; }
+
+            // Physics Derivations
+            r.dewPoint = calcDewPoint(r.temp, r.hum);
+            r.heatIndex = calcHeatIndex(r.temp, r.hum);
+            r.airDensity = calcAirDensity(r.press || 1013.25, r.temp);
+            r.vaporPress = calcVaporPressure(r.temp, r.hum);
+            r.absHum = calcAbsoluteHumidity(r.temp, r.hum);
+            r.boilingPt = calcBoilingPoint(r.baroAlt);
+            r.coriolis = calcCoriolis(r.lat) * 1e5; 
+            r.equatorDist = distToEquator(r.lat);
+            r.pace = (r.speed > 0.5) ? (60.0 / r.speed) : 0; 
+
+            if(prev) {
+                r.acc = ((r.speed - prev.speed) / 3.6) / dt; 
+                r.jerk = (r.acc - (prev.acc || 0)) / dt;
+                let distDelta = (r.lat !== 0 && prev.lat !== 0) ? haversine(prev.lat, prev.lng, r.lat, r.lng) : 0;
+                r.incline = (distDelta > 0) ? ((r.baroAlt - prev.baroAlt) / distDelta) * 100 : 0;
+                cumulativeDistance += distDelta;
+            } else { r.acc = 0; r.jerk = 0; r.incline = 0; }
+            
+            r.odometer = cumulativeDistance / 1000.0;
+            if(originalLat && r.lat !== 0) {
+                let currentTether = haversine(originalLat, originalLng, r.lat, r.lng) / 1000.0;
+                r.tether = currentTether;
+                if(currentTether > maxTether) maxTether = currentTether;
+            } else { r.tether = 0; }
+
+            // Update Stats
+            if (r.speed > stats.speed.max) stats.speed.max = r.speed; 
+            if (r.temp > stats.temp.max) stats.temp.max = r.temp; 
+            if (r.hum > stats.hum.max) stats.hum.max = r.hum; 
+            if (r.heatIndex > stats.hi.max) stats.hi.max = r.heatIndex;
+            if (Math.abs(r.jerk) > stats.jerk.max) stats.jerk.max = Math.abs(r.jerk);
+            if (Math.abs(r.incline) > stats.incline.max) stats.incline.max = Math.abs(r.incline);
+
+            globalRecords.push(r);
+            
+            // DOM Updates
+            document.getElementById('statOdometer').innerText = r.odometer.toFixed(2);
+            document.getElementById('statMaxTemp').innerText = stats.temp.max.toFixed(1);
+            document.getElementById('statMaxHI').innerText = stats.hi.max.toFixed(1);
+            document.getElementById('statMaxTether').innerText = maxTether.toFixed(2);
+
+            document.getElementById('labDewPoint').innerText = r.dewPoint.toFixed(1) + "C";
+            document.getElementById('labAirDensity').innerText = r.airDensity.toFixed(3) + "KG";
+            document.getElementById('labMaxJerk').innerText = stats.jerk.max.toFixed(2);
+            
+            let fogAlert = document.getElementById('lensFogAlert');
+            if(Math.abs(r.temp - r.dewPoint) <= 2.0) {
+                fogAlert.innerText = "WARN: CONDENSATION"; fogAlert.className = "text-[9px] px-1 bg-red-900 text-red-500 blink";
+            } else { fogAlert.innerText = "NOMINAL"; fogAlert.className = "text-[9px] px-1 bg-green-900 text-green-500"; }
+
+            document.getElementById('deepBoiling').innerText = r.boilingPt.toFixed(2) + " °C";
+            document.getElementById('deepVapor').innerText = r.vaporPress.toFixed(2);
+            document.getElementById('deepAbsHum').innerText = r.absHum.toFixed(2);
+            document.getElementById('barVapor').style.width = Math.min((r.vaporPress / 50) * 100, 100) + "%";
+            document.getElementById('barAbsHum').style.width = Math.min((r.absHum / 30) * 100, 100) + "%";
+            document.getElementById('deepCoriolis').innerText = r.coriolis.toFixed(4) + " × 10⁻⁵ /s";
+            document.getElementById('deepEquator').innerText = r.equatorDist.toFixed(1) + " km";
+            document.getElementById('deepIncline').innerText = stats.incline.max.toFixed(1) + " %";
+
+            // Update UI components
+            prependTimelineItem(r, globalRecords.length - 1);
+            inspectRecordSnapshot(globalRecords.length - 1); // Auto-inspect latest
+            
+            // Append line segment to map
+            if(prev && r.lat !== 0 && prev.lat !== 0) {
+                L.polyline([[prev.lat, prev.lng], [r.lat, r.lng]], { color: getSegmentColor(r), weight: 3, opacity: 0.8 }).addTo(pathSegmentsGroup);
+                map.panTo([r.lat, r.lng]);
+            }
+
+            // Update chart if visible
+            if(!document.getElementById('tab-charts').classList.contains('hidden')) { updateAnalyticsChart(); }
+        }
+
         function getSegmentColor(rec) {
             if (activeColorMode === 'default') return '#22c55e';
             let min, max, fr;
-            if (activeColorMode === 'temp') { min = isAmplified ? stats.temp.min : 10; max = isAmplified ? stats.temp.max : 35; fr = Math.min(Math.max((rec.temp - min) / (max - min), 0), 1); return `rgb(${Math.round(34 + fr*221)}, ${Math.round(197 - fr*197)}, 0)`; }
-            if (activeColorMode === 'hum') { min = isAmplified ? stats.hum.min : 20; max = isAmplified ? stats.hum.max : 90; fr = Math.min(Math.max((rec.hum - min) / (max - min), 0), 1); return `rgb(0, ${Math.round(100 + fr*155)}, ${Math.round(255 - fr*100)})`; }
-            if (activeColorMode === 'speed') { min = isAmplified ? stats.speed.min : 0; max = isAmplified ? stats.speed.max : 10; fr = Math.min(Math.max((rec.speed - min) / (max - min), 0), 1); return `rgb(${Math.round(255 - fr*255)}, ${Math.round(fr*255)}, 0)`; }
-            if (activeColorMode === 'incline') { min = -10; max = 10; let clamp = Math.max(-10, Math.min(10, rec.incline)); fr = (clamp + 10) / 20; return `rgb(${Math.round(fr*255)}, 0, ${Math.round((1-fr)*255)})`; } // Purple (down) to Red (up)
+            if (activeColorMode === 'temp') { min = 10; max = 35; fr = Math.min(Math.max((rec.temp - min) / (max - min), 0), 1); return `rgb(${Math.round(34 + fr*221)}, ${Math.round(197 - fr*197)}, 0)`; }
+            if (activeColorMode === 'hum') { min = 20; max = 90; fr = Math.min(Math.max((rec.hum - min) / (max - min), 0), 1); return `rgb(0, ${Math.round(100 + fr*155)}, ${Math.round(255 - fr*100)})`; }
+            if (activeColorMode === 'speed') { min = 0; max = 10; fr = Math.min(Math.max((rec.speed - min) / (max - min), 0), 1); return `rgb(${Math.round(255 - fr*255)}, ${Math.round(fr*255)}, 0)`; }
+            if (activeColorMode === 'incline') { min = -10; max = 10; let clamp = Math.max(-10, Math.min(10, rec.incline)); fr = (clamp + 10) / 20; return `rgb(${Math.round(fr*255)}, 0, ${Math.round((1-fr)*255)})`; } 
             return '#22c55e';
         }
 
-        document.getElementById('fileInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            termLog(`FILE_MOUNTED: ${file.name} [${(file.size/1024).toFixed(2)} KB]`);
-            termLog("COMMENCING HEX-DUMP ANALYSIS...");
-            
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                let raw = evt.target.result.trim();
-                let errorsFixed = 0;
-
-                if(raw.endsWith(",")) { raw = raw.slice(0, -1); termLog("ERR_01: TRAILING COMMA FOUND -> STRIPPED", "warn"); errorsFixed++; }
-                if(!raw.endsWith("]")) { raw += "]"; termLog("ERR_02: MISSING ARRAY TERMINATOR -> APPENDED", "warn"); errorsFixed++; }
-                
-                try { 
-                    globalRecords = JSON.parse(raw); 
-                    termLog(`PARSE_SUCCESS: ${globalRecords.length} NODES EXTRACTED.`);
-                    if(errorsFixed > 0) termLog(`INTEGRITY RESTORED. FIXES APPLIED: ${errorsFixed}`);
-                    
-                    document.getElementById('btn-dump').disabled = false;
-                    document.getElementById('btn-dump').classList.remove('text-green-800');
-                    document.getElementById('btn-dump').classList.add('text-green-400');
-
-                } catch(err) { termLog(`CRITICAL_FAULT: JSON PARSE FAILED. ${err.message}`, "err"); return; }
-
-                // Reset Stats
-                stats = { speed: { max: -1, min: 999, sum: 0 }, temp: { max: -1, min: 999, sum: 0 }, hum: { max: -1, min: 999, sum: 0 }, baroAlt: { max: -1, min: 999, sum: 0 }, gpsAlt: { max: -1, min: 999, sum: 0 }, hi: { max: -1 }, jerk: { max: -1 }, incline: { max: -Infinity }, dew: { sum: 0 }, density: { sum: 0 }, vapor: { sum: 0 }, absHum: { sum: 0 }, boiling: { sum: 0 }, equatorDist: { sum: 0 }, coriolis: { sum: 0 } };
-                
-                let cumulativeDistance = 0;
-                let originalLat = globalRecords[0].lat;
-                let originalLng = globalRecords[0].lng;
-
-                globalRecords.forEach((r, idx) => {
-                    let prev = idx > 0 ? globalRecords[idx-1] : null;
-                    let dt = prev ? (r.uptime - prev.uptime) : 5; if(dt <= 0) dt = 1;
-
-                    r.heading = r.heading || 0; r.fix = r.fix !== undefined ? r.fix : 1;
-                    r.baroAlt = r.baroAlt !== undefined ? r.baroAlt : (r.alt || 0);
-                    r.ble = r.ble || "UNKNOWN";
-                    
-                    // Old Calcs
-                    r.dewPoint = calcDewPoint(r.temp, r.hum);
-                    r.heatIndex = calcHeatIndex(r.temp, r.hum);
-                    r.airDensity = calcAirDensity(r.press || 1013.25, r.temp);
-                    
-                    // New Calcs
-                    r.vaporPress = calcVaporPressure(r.temp, r.hum);
-                    r.absHum = calcAbsoluteHumidity(r.temp, r.hum);
-                    r.boilingPt = calcBoilingPoint(r.baroAlt);
-                    r.coriolis = calcCoriolis(r.lat) * 1e5; // Scaled for readability
-                    r.equatorDist = distToEquator(r.lat);
-                    r.pace = (r.speed > 0.5) ? (60.0 / r.speed) : 0; // min per km
-
-                    if(prev) {
-                        r.acc = ((r.speed - prev.speed) / 3.6) / dt; 
-                        r.jerk = (r.acc - (prev.acc || 0)) / dt;
-                        let distDelta = haversine(prev.lat, prev.lng, r.lat, r.lng);
-                        r.incline = (distDelta > 0) ? ((r.baroAlt - prev.baroAlt) / distDelta) * 100 : 0;
-                        cumulativeDistance += distDelta;
-                    } else { r.acc = 0; r.jerk = 0; r.incline = 0; }
-                    
-                    r.odometer = cumulativeDistance / 1000.0;
-                    r.tether = haversine(originalLat, originalLng, r.lat, r.lng) / 1000.0;
-
-                    if (r.speed > stats.speed.max) stats.speed.max = r.speed; if (r.speed < stats.speed.min) stats.speed.min = r.speed; stats.speed.sum += r.speed;
-                    if (r.temp > stats.temp.max) stats.temp.max = r.temp; if (r.temp < stats.temp.min) stats.temp.min = r.temp; stats.temp.sum += r.temp;
-                    if (r.hum > stats.hum.max) stats.hum.max = r.hum; if (r.hum < stats.hum.min) stats.hum.min = r.hum; stats.hum.sum += r.hum;
-                    if (r.baroAlt > stats.baroAlt.max) stats.baroAlt.max = r.baroAlt; if (r.baroAlt < stats.baroAlt.min) stats.baroAlt.min = r.baroAlt; stats.baroAlt.sum += r.baroAlt;
-                    if (r.gpsAlt > stats.gpsAlt.max) stats.gpsAlt.max = r.gpsAlt; if (r.gpsAlt < stats.gpsAlt.min) stats.gpsAlt.min = r.gpsAlt; stats.gpsAlt.sum += r.gpsAlt;
-                    
-                    if (r.heatIndex > stats.hi.max) stats.hi.max = r.heatIndex;
-                    if (Math.abs(r.jerk) > stats.jerk.max) stats.jerk.max = Math.abs(r.jerk);
-                    if (Math.abs(r.incline) > stats.incline.max) stats.incline.max = Math.abs(r.incline);
-
-                    stats.dew.sum += r.dewPoint; stats.density.sum += r.airDensity;
-                    stats.vapor.sum += r.vaporPress; stats.absHum.sum += r.absHum;
-                    stats.boiling.sum += r.boilingPt; stats.equatorDist.sum += r.equatorDist;
-                    stats.coriolis.sum += r.coriolis;
-                });
-
-                let count = globalRecords.length;
-
-                // Update Top Ribbons
-                document.getElementById('statOdometer').innerText = (cumulativeDistance / 1000.0).toFixed(2);
-                document.getElementById('statMaxTemp').innerText = stats.temp.max.toFixed(1);
-                document.getElementById('statMaxHI').innerText = stats.hi.max.toFixed(1);
-                document.getElementById('statMaxTether').innerText = Math.max(...globalRecords.map(r => r.tether)).toFixed(2);
-
-                // Update Physics Tab
-                document.getElementById('labDewPoint').innerText = (stats.dew.sum / count).toFixed(1) + "C";
-                document.getElementById('labAirDensity').innerText = (stats.density.sum / count).toFixed(3) + "KG";
-                document.getElementById('labMaxJerk').innerText = stats.jerk.max.toFixed(2);
-                
-                let lastRec = globalRecords[count-1];
-                let fogAlert = document.getElementById('lensFogAlert');
-                if(Math.abs(lastRec.temp - lastRec.dewPoint) <= 2.0) {
-                    fogAlert.innerText = "WARN: CONDENSATION"; fogAlert.className = "text-[9px] px-1 bg-red-900 text-red-500 blink";
-                } else { fogAlert.innerText = "NOMINAL"; fogAlert.className = "text-[9px] px-1 bg-green-900 text-green-500"; }
-
-                // Update Deep Metrics Tab
-                document.getElementById('deepBoiling').innerText = (stats.boiling.sum / count).toFixed(2) + " °C";
-                let avgVapor = (stats.vapor.sum / count);
-                let avgAbsHum = (stats.absHum.sum / count);
-                document.getElementById('deepVapor').innerText = avgVapor.toFixed(2);
-                document.getElementById('deepAbsHum').innerText = avgAbsHum.toFixed(2);
-                
-                // Set bar widths (rough approximations for visual flair)
-                document.getElementById('barVapor').style.width = Math.min((avgVapor / 50) * 100, 100) + "%";
-                document.getElementById('barAbsHum').style.width = Math.min((avgAbsHum / 30) * 100, 100) + "%";
-
-                document.getElementById('deepCoriolis').innerText = (stats.coriolis.sum / count).toFixed(4) + " × 10⁻⁵ /s";
-                document.getElementById('deepEquator').innerText = (stats.equatorDist.sum / count).toFixed(1) + " km";
-                document.getElementById('deepIncline').innerText = stats.incline.max.toFixed(1) + " %";
-
-                populateTimelineView();
-                renderColorCodedMapRoutes();
-                if(!document.getElementById('tab-charts').classList.contains('hidden')) { updateAnalyticsChart(); }
-            };
-            reader.readAsText(file);
-        });
-
-        function dumpMemory() {
-            if(globalRecords.length === 0) return;
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(globalRecords, null, 2));
-            const dlAnchorElem = document.createElement('a');
-            dlAnchorElem.setAttribute("href", dataStr);
-            dlAnchorElem.setAttribute("download", "telemetrix_clean_dump.json");
-            dlAnchorElem.click();
-            termLog("MEMORY DUMP INITIATED. FILE DOWNLOADED.");
-        }
-
-        function pingNodes() {
-            termLog("BROADCASTING DIAGNOSTIC PING...");
-            setTimeout(() => { termLog(`RECEIVED ACK FROM ${globalRecords.length > 0 ? globalRecords.length : 0} NODES.`, "info"); }, 600);
-        }
-
-        function populateTimelineView() {
-            const timelineDiv = document.getElementById('timeline');
-            timelineDiv.innerHTML = '';
-            globalRecords.slice().reverse().forEach((r, rIdx) => {
-                const actIdx = globalRecords.length - 1 - rIdx;
-                const block = document.createElement('div');
-                let fixStr = r.fix ? `[3D]` : `[XX]`;
-                let colorClass = r.fix ? `text-green-500` : `text-red-500`;
-
-                block.className = "p-1.5 border-b border-green-900 cursor-pointer hover:bg-green-900/40 transition-colors timeline-item";
-                block.setAttribute('onclick', `inspectRecordSnapshot(${actIdx}, this)`);
-                block.id = `timeline-node-${actIdx}`;
-                block.innerHTML = `
-                    <div class="flex justify-between items-center ${colorClass}">
-                        <span>${fixStr} T+${r.uptime}s</span><span>${r.speed.toFixed(1)}kph</span>
-                    </div>
-                `;
-                timelineDiv.appendChild(block);
+        function changeRouteColorMode(mode) { 
+            activeColorMode = mode; 
+            ['default', 'temp', 'hum', 'speed', 'incline'].forEach(m => {
+                document.getElementById(`btn-${m}`).className = (m === mode) ? "border border-green-400 bg-green-500 text-black px-2 py-1 font-bold" : "border border-green-800 text-green-600 px-2 py-1 hover-invert";
             });
+            // Re-render lines if mode changes
+            pathSegmentsGroup.clearLayers();
+            for(let i=1; i<globalRecords.length; i++) {
+                if(globalRecords[i].lat !== 0 && globalRecords[i-1].lat !== 0) {
+                    L.polyline([[globalRecords[i-1].lat, globalRecords[i-1].lng], [globalRecords[i].lat, globalRecords[i].lng]], { color: getSegmentColor(globalRecords[i]), weight: 3, opacity: 0.8 }).addTo(pathSegmentsGroup);
+                }
+            }
         }
 
-        function renderColorCodedMapRoutes() {
-            pathSegmentsGroup.clearLayers();
-            if(startMarker) map.removeLayer(startMarker); if(endMarker) map.removeLayer(endMarker);
-            let validCoords = [];
-            globalRecords.forEach((r, i) => { if(r.lat !== 0 && r.lng !== 0) validCoords.push({coords: [r.lat, r.lng], index: i}); });
-            if(validCoords.length === 0) return;
+        function prependTimelineItem(r, actIdx) {
+            const timelineDiv = document.getElementById('timeline');
+            const block = document.createElement('div');
+            let fixStr = r.fix ? `[3D]` : `[XX]`;
+            let colorClass = r.fix ? `text-green-500` : `text-red-500`;
 
-            for(let i=0; i<validCoords.length - 1; i++) {
-                let startNode = validCoords[i], endNode = validCoords[i+1];
-                let polySegment = L.polyline([startNode.coords, endNode.coords], { color: getSegmentColor(globalRecords[startNode.index]), weight: 3, opacity: 0.8 });
-                polySegment.on('click', function() {
-                    let sEl = document.getElementById(`timeline-node-${startNode.index}`);
-                    inspectRecordSnapshot(startNode.index, sEl);
-                    if(sEl) sEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                });
-                pathSegmentsGroup.addLayer(polySegment);
-            }
-            let boundsArray = validCoords.map(v => v.coords);
-            map.fitBounds(L.polyline(boundsArray).getBounds(), { padding: [30,30] });
-            
-            const hackIcon = L.divIcon({ className: 'bg-green-500 border border-black w-2 h-2 rotate-45', iconSize: [10, 10] });
-            startMarker = L.marker(boundsArray[0], {icon: hackIcon}).addTo(map).bindPopup('ORIGIN');
-            endMarker = L.marker(boundsArray[boundsArray.length - 1], {icon: hackIcon}).addTo(map).bindPopup('TERMINAL');
+            block.className = "p-1.5 border-b border-green-900 cursor-pointer hover:bg-green-900/40 transition-colors timeline-item";
+            block.setAttribute('onclick', `inspectRecordSnapshot(${actIdx})`);
+            block.id = `timeline-node-${actIdx}`;
+            block.innerHTML = `
+                <div class="flex justify-between items-center ${colorClass}">
+                    <span>${fixStr} T+${r.uptime}s</span><span>${r.speed.toFixed(1)}kph</span>
+                </div>
+            `;
+            timelineDiv.prepend(block); // Add to top for live stream feel
         }
 
         function updateAnalyticsChart() {
@@ -510,8 +442,11 @@
             const context = document.getElementById('primaryAnalyticsCanvas').getContext('2d');
             const targetMetric = document.getElementById('chartMetricSelector').value;
 
-            let labels = globalRecords.map(r => `T+${r.uptime}`);
-            let dataPoints = globalRecords.map(r => r[targetMetric]);
+            // Cap array size so the browser doesn't freeze over long sessions
+            let renderRecords = globalRecords.slice(-100); 
+
+            let labels = renderRecords.map(r => `T+${r.uptime}`);
+            let dataPoints = renderRecords.map(r => r[targetMetric]);
             
             if(timeChartInstance) { timeChartInstance.destroy(); }
 
@@ -523,20 +458,16 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: `// ${targetMetric.toUpperCase()}`,
+                        label: `// ${targetMetric.toUpperCase()} (LAST 100)`,
                         data: dataPoints,
                         borderColor: '#22c55e',
                         backgroundColor: 'rgba(34, 197, 94, 0.1)',
                         borderWidth: 1.5,
-                        tension: 0, 
-                        fill: true,
-                        pointBackgroundColor: '#000',
-                        pointBorderColor: '#22c55e',
-                        pointRadius: 2
+                        tension: 0, fill: true, pointRadius: 1
                     }]
                 },
                 options: {
-                    responsive: true, maintainAspectRatio: false,
+                    responsive: true, maintainAspectRatio: false, animation: false,
                     scales: {
                         x: { grid: { color: '#064e3b' }, ticks: { maxRotation: 45 } },
                         y: { grid: { color: '#064e3b' } }
@@ -545,51 +476,45 @@
             });
         }
 
-        function changeRouteColorMode(mode) { 
-            activeColorMode = mode; 
-            ['default', 'temp', 'hum', 'speed', 'incline'].forEach(m => {
-                document.getElementById(`btn-${m}`).className = (m === mode) ? "border border-green-400 bg-green-500 text-black px-2 py-1 font-bold" : "border border-green-800 text-green-600 px-2 py-1 hover-invert";
-            });
-            if(globalRecords.length > 0) renderColorCodedMapRoutes(); 
-        }
-
-        function toggleAmplify() { isAmplified = document.getElementById('amplifyBounds').checked; if(globalRecords.length > 0) renderColorCodedMapRoutes(); }
-
-        function inspectRecordSnapshot(index, element) {
+        function inspectRecordSnapshot(index) {
             document.querySelectorAll('.timeline-item').forEach(item => { item.classList.remove('bg-green-800', 'text-black'); });
+            let element = document.getElementById(`timeline-node-${index}`);
             if(element) { element.classList.add('bg-green-800', 'text-black'); }
 
             const target = globalRecords[index]; if(!target) return;
-            
             let fixStr = target.fix ? `LOCKED` : `SEEKING`;
             
             document.getElementById('detailsCard').innerHTML = `
                 <div class="flex justify-between border-b border-green-800 pb-1 mb-2 text-green-400">
                     <span>> INDEX: 0x${index.toString(16).toUpperCase().padStart(4, '0')}</span>
-                    <span>TS: ${target.ts}</span>
+                    <span>T+${target.uptime}s</span>
                 </div>
                 <div class="grid grid-cols-2 gap-y-1">
                     <div>GPS_FIX: <span class="${target.fix ? 'text-green-500' : 'text-red-500 blink'}">${fixStr}</span></div>
                     <div>BLE_SYS: <span>${target.ble}</span></div>
                     <div>VELOCITY: <span class="text-green-300">${target.speed.toFixed(1)}kph</span></div>
-                    <div>PACE: <span>${target.pace.toFixed(1)}m/km</span></div>
-                    <div>INCLINE: <span class="text-green-300">${target.incline.toFixed(1)}%</span></div>
                     <div>HEADING: <span>${target.heading.toFixed(0)}°</span></div>
                     <div>B_ALT: <span class="text-green-300">${target.baroAlt.toFixed(1)}m</span></div>
-                    <div>TEMP: <span>${target.temp}°C</span></div>
+                    <div>TEMP: <span>${target.temp.toFixed(1)}°C</span></div>
                     <div>VAPOR_P: <span>${target.vaporPress.toFixed(1)}hPa</span></div>
                     <div>DEW_PT: <span>${target.dewPoint.toFixed(1)}°C</span></div>
                 </div>
             `;
 
             if(target.lat !== 0 && target.lng !== 0) {
-                map.flyTo([target.lat, target.lng], 17, { animate: true, duration: 0.3 });
                 if(activeSelectionHighlight) map.removeLayer(activeSelectionHighlight);
                 activeSelectionHighlight = L.circleMarker([target.lat, target.lng], { radius: 12, color: '#22c55e', weight: 1, fillColor: 'transparent' }).addTo(map);
-                
-                L.polyline([[target.lat - 0.001, target.lng], [target.lat + 0.001, target.lng]], {color: '#22c55e', weight: 1, opacity: 0.5}).addTo(map);
-                L.polyline([[target.lat, target.lng - 0.001], [target.lat, target.lng + 0.001]], {color: '#22c55e', weight: 1, opacity: 0.5}).addTo(map);
             }
+        }
+
+        function dumpMemory() {
+            if(globalRecords.length === 0) return;
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(globalRecords, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", "telemetrix_live_dump.json");
+            dlAnchorElem.click();
+            termLog("MEMORY DUMP INITIATED. JSON SAVED.");
         }
     </script>
 </body>

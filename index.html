@@ -227,7 +227,9 @@
         let activeColorMode = 'default';
         let timeChartInstance = null;
         let wsSocket = null;
-
+        let reconnectTimer = null;
+        let lastIpAddress = "";
+        let shouldReconnect = false;
         // Cumulative State Variables
         let cumulativeDistance = 0;
         let originalLat = null;
@@ -279,42 +281,135 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
+        function scheduleReconnect()
+        {
+            clearTimeout(reconnectTimer);
+
+            reconnectTimer = setTimeout(() =>
+            {
+                if(
+                    shouldReconnect &&
+                    lastIpAddress &&
+                    (!wsSocket || wsSocket.readyState === WebSocket.CLOSED)
+                )
+                {
+                    termLog("AUTO-RECONNECT ATTEMPT.");
+                    connectLiveStream(lastIpAddress);
+                }
+            }, 3000);
+        }
+
         // --- LIVE WEB SOCKET INTEGRATION ---
-        function connectLiveStream() {
-            let ip = document.getElementById('ws-ip').value.trim();
-            if(!ip) { termLog("ERR: INVALID IP FORMAT", "err"); return; }
-            
-            if(wsSocket) { wsSocket.close(); }
-            
-            let wsUrl = `ws://${ip}/ws`;
-            termLog(`ATTEMPTING HANDSHAKE WITH ${wsUrl}...`);
-            
-            wsSocket = new WebSocket(wsUrl);
-            
-            wsSocket.onopen = function() {
+        function connectLiveStream(forceIp = null)
+        {
+            let ip = forceIp || document.getElementById('ws-ip').value.trim();
+
+            if(!ip)
+            {
+                termLog("ERR: INVALID IP FORMAT", "err");
+                return;
+            }
+
+            // Remove protocols if user pasted them
+            ip = ip
+                .replace(/^ws:\/\//i, '')
+                .replace(/^wss:\/\//i, '')
+                .replace(/\/+$/, '');
+
+            lastIpAddress = ip;
+            shouldReconnect = true;
+
+            const wsUrl = `ws://${ip}/ws`;
+
+            if(wsSocket)
+            {
+                wsSocket.onclose = null;
+                wsSocket.close();
+                wsSocket = null;
+            }
+
+            clearTimeout(reconnectTimer);
+
+            termLog(`ATTEMPTING HANDSHAKE WITH ${wsUrl}.`);
+
+            try
+            {
+                wsSocket = new WebSocket(wsUrl);
+            }
+            catch(err)
+            {
+                termLog("WS_ERROR: SOCKET CREATION FAILED", "err");
+                scheduleReconnect();
+                return;
+            }
+
+            wsSocket.onopen = function()
+            {
                 document.getElementById('ws-status').innerText = "ONLINE";
                 document.getElementById('ws-status').className = "text-green-500 blink";
+
                 document.getElementById('btn-dump').disabled = false;
-                document.getElementById('btn-dump').classList.replace('text-green-800', 'text-green-400');
+                document.getElementById('btn-dump')
+                    .classList.replace('text-green-800', 'text-green-400');
+
                 termLog("HANDSHAKE SUCCESS. RECEIVING LIVE DATA.");
+
+                clearTimeout(reconnectTimer);
             };
-            
-            wsSocket.onmessage = function(event) {
-                try {
-                    let record = JSON.parse(event.data);
+
+            wsSocket.onmessage = function(event)
+            {
+                try
+                {
+                    const record = JSON.parse(event.data);
                     processLiveRecord(record);
-                } catch(e) {
+                }
+                catch(e)
+                {
                     termLog("ERR: MALFORMED JSON PACKET", "warn");
                 }
             };
-            
-            wsSocket.onerror = function() { termLog("WS_ERROR: CONNECTION REFUSED", "err"); };
-            wsSocket.onclose = function() {
+
+            wsSocket.onerror = function()
+            {
+                termLog("WS_ERROR: CONNECTION ISSUE", "warn");
+            };
+
+            wsSocket.onclose = function(event)
+            {
                 document.getElementById('ws-status').innerText = "OFFLINE";
                 document.getElementById('ws-status').className = "text-red-500";
-                termLog("WS_CLOSED: STREAM TERMINATED", "warn");
+
+                termLog(
+                    `WS_CLOSED: CODE ${event.code}. RECONNECT PENDING.`,
+                    "warn"
+                );
+
+                if(shouldReconnect)
+                {
+                    scheduleReconnect();
+                }
             };
         }
+
+        document.addEventListener("visibilitychange", () =>
+        {
+            if(
+                document.visibilityState === "visible" &&
+                shouldReconnect &&
+                lastIpAddress
+            )
+            {
+                if(
+                    !wsSocket ||
+                    wsSocket.readyState === WebSocket.CLOSED
+                )
+                {
+                    termLog("TAB RESTORED. RECONNECTING...");
+                    connectLiveStream(lastIpAddress);
+                }
+            }
+        });
 
         function processLiveRecord(r) {
             let prev = globalRecords.length > 0 ? globalRecords[globalRecords.length-1] : null;

@@ -38,6 +38,7 @@
                 <div class="mt-4 flex flex-wrap gap-2 items-center">
                     <input type="text" id="ws-ip" value="telemetrix.local" disabled class="term-input px-2 py-1 text-xs w-32 opacity-50" />
                     <button onclick="connectLiveStream()" class="hover-invert border border-green-700 px-3 py-1 text-xs uppercase">[ CONNECT_STREAM ]</button>
+                    <button onclick="disconnectStream()" class="hover-invert border border-red-700 px-3 py-1 text-xs uppercase text-red-500">[ DISCONNECT ]</button>
                     <button onclick="dumpMemory()" class="hover-invert border border-green-700 px-3 py-1 text-xs uppercase text-green-800" id="btn-dump" disabled>[ DUMP_MEM ]</button>
                 </div>
             </div>
@@ -300,40 +301,50 @@
         }
 
                 // --- LIVE WEB SOCKET INTEGRATION ---
-        function connectLiveStream() {
-            // We use the mDNS name to allow the browser to find the ESP32
-            let wsUrl = "ws://telemetrix.local/ws";
+        function disconnectStream() {
+            shouldReconnect = false; // Stop the auto-retry logic
+            if (wsSocket) {
+                wsSocket.onclose = null; // Prevent the retry logic from firing
+                wsSocket.close();
+                wsSocket = null;
+            }
+            document.getElementById('ws-status').innerText = "DISCONNECTED";
+            document.getElementById('ws-status').className = "text-red-500";
+            termLog("STREAM MANUALLY TERMINATED.");
+        }
+
+        // --- UPDATED CONNECTION FUNCTION ---
+        function connectLiveStream(forceIp = null) {
+            let ip = forceIp || document.getElementById('ws-ip').value.trim();
+            if(!ip) { termLog("ERR: INVALID IP", "err"); return; }
             
+            ip = ip.replace(/^ws:\/\//i, '').replace(/^wss:\/\//i, '').replace(/\/+$/, '');
+            lastIpAddress = ip;
+            shouldReconnect = true; // Enable auto-retry
+
             if(wsSocket) { wsSocket.close(); }
-            
-            termLog(`ATTEMPTING HANDSHAKE WITH ${wsUrl}...`);
-            
-            wsSocket = new WebSocket(wsUrl);
-            
+
+            termLog(`ATTEMPTING HANDSHAKE WITH ws://${ip}/ws...`);
+            wsSocket = new WebSocket(`ws://${ip}/ws`);
+
             wsSocket.onopen = function() {
                 document.getElementById('ws-status').innerText = "ONLINE";
                 document.getElementById('ws-status').className = "text-green-500 blink";
                 termLog("HANDSHAKE SUCCESS.");
             };
-            
-            wsSocket.onmessage = function(event) {
-                try {
-                    let record = JSON.parse(event.data);
-                    processLiveRecord(record);
-                } catch(e) {
-                    termLog("ERR: MALFORMED PACKET", "warn");
+
+            wsSocket.onclose = function(event) {
+                document.getElementById('ws-status').innerText = "OFFLINE";
+                document.getElementById('ws-status').className = "text-red-500";
+                
+                // Only trigger scheduleReconnect if we haven't manually disconnected
+                if (shouldReconnect) {
+                    termLog(`CONNECTION LOST (Code: ${event.code}). RETRYING...`, "warn");
+                    scheduleReconnect();
                 }
             };
             
             wsSocket.onerror = function() { termLog("WS_ERROR: CONNECTION REFUSED", "err"); };
-            
-            wsSocket.onclose = function() {
-                document.getElementById('ws-status').innerText = "OFFLINE";
-                document.getElementById('ws-status').className = "text-red-500";
-                termLog("STREAM TERMINATED. RECONNECTING IN 3S...");
-                // Auto-retry for mobile stability when the browser switches tabs/wakes up
-                setTimeout(connectLiveStream, 3000);
-            };
         }
         document.addEventListener("visibilitychange", () => {
             if (document.visibilityState === 'visible') {

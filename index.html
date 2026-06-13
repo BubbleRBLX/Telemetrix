@@ -33,13 +33,29 @@
             <div class="crt-border p-4 bg-black flex flex-col justify-between">
                 <div>
                     <h1 class="text-2xl font-black tracking-widest text-green-500 crt-text">SYS.TELEMETRIX<span class="blink">_</span></h1>
-                    <p class="text-[10px] text-green-700 uppercase mt-1">Live WebSocket Uplink v3.0</p>
+                    <p class="text-[10px] text-green-700 uppercase mt-1">Live WebSocket Uplink v3.1</p>
                 </div>
                 <div class="mt-4 flex flex-wrap gap-2 items-center">
-                    <input type="text" id="ws-ip" value="telemetrix.local" disabled class="term-input px-2 py-1 text-xs w-32 opacity-50" />
-                    <button onclick="connectLiveStream()" class="hover-invert border border-green-700 px-3 py-1 text-xs uppercase">[ CONNECT_STREAM ]</button>
-                    <button onclick="disconnectStream()" class="hover-invert border border-red-700 px-3 py-1 text-xs uppercase text-red-500">[ DISCONNECT ]</button>
-                    <button onclick="dumpMemory()" class="hover-invert border border-green-700 px-3 py-1 text-xs uppercase text-green-800" id="btn-dump" disabled>[ DUMP_MEM ]</button>
+                    <!-- FIXED: Made editable + better default + placeholder -->
+                    <input type="text" id="ws-ip" value="192.168.1.XXX" 
+                        placeholder="192.168.1.XXX or telemetrix.local"
+                        class="term-input px-2 py-1 text-xs w-40 focus:w-52 transition-all" />
+                    
+                    <button onclick="connectLiveStream()" 
+                            class="hover-invert border border-green-700 px-3 py-1 text-xs uppercase font-bold">
+                        [ CONNECT ]
+                    </button>
+                    <button onclick="disconnectStream()" 
+                            class="hover-invert border border-red-700 px-3 py-1 text-xs uppercase text-red-500">
+                        [ DISCONNECT ]
+                    </button>
+                    <button onclick="dumpMemory()" 
+                            class="hover-invert border border-green-700 px-3 py-1 text-xs uppercase text-green-800" id="btn-dump">
+                        [ DUMP_MEM ]
+                    </button>
+                </div>
+                <div class="text-[9px] text-green-700 mt-2">
+                    💡 Use the ESP32's actual IP address (check Serial Monitor)
                 </div>
             </div>
 
@@ -50,7 +66,7 @@
                 </div>
                 <div id="terminal-out" class="text-[10px] mt-1 overflow-y-auto flex-1 leading-tight text-green-500 p-1">
                     > INITIATING KERNEL... OK<br>
-                    > ENTER ESP32 LOCAL IP TO BEGIN STREAM.<br>
+                    > ENTER ESP32 IP ADDRESS TO BEGIN STREAM.<br>
                 </div>
             </div>
         </header>
@@ -243,6 +259,15 @@
             hi: { max: -Infinity }, jerk: { max: -Infinity }, incline: { max: -Infinity }
         };
 
+        // Auto-detect common local IPs on mobile (optional helper)
+        function suggestLocalIP() {
+            const ipInput = document.getElementById('ws-ip');
+            // Common gateway ranges
+            if (ipInput.value.includes('XXX')) {
+                termLog("Tip: Check Serial Monitor on ESP32 for its IP address", "warn");
+            }
+        }
+
         function termLog(msg, type="info") {
             const term = document.getElementById('terminal-out');
             let color = type === "err" ? "text-red-500" : (type === "warn" ? "text-yellow-500" : "text-green-500");
@@ -316,7 +341,12 @@
         // --- UPDATED CONNECTION FUNCTION ---
         function connectLiveStream(forceIp = null) {
             let ip = forceIp || document.getElementById('ws-ip').value.trim();
-            if(!ip) { termLog("ERR: INVALID IP", "err"); return; }
+    
+            if (!ip || ip.includes('XXX')) {
+                termLog("ERROR: Please enter the real ESP32 IP address (e.g. 192.168.1.45)", "err");
+                suggestLocalIP();
+                return;
+            }
             
             ip = ip.replace(/^ws:\/\//i, '').replace(/^wss:\/\//i, '').replace(/\/+$/, '');
             lastIpAddress = ip;

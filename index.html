@@ -343,6 +343,18 @@
                     scheduleReconnect();
                 }
             };
+
+            wsSocket.onmessage = function(event) {
+                console.log("DEBUG: Daten empfangen -> ", event.data); // Das zeigt dir in der Konsole, was ankommt
+                try {
+                    const record = JSON.parse(event.data);
+                    console.log("DEBUG: Parsen erfolgreich -> ", record); // Zeigt dir das JSON-Objekt
+                    processLiveRecord(record);
+                } catch(e) {
+                    console.error("DEBUG: PARSE FEHLER: ", e); // Zeigt dir genau, warum es nicht geht
+                    termLog("ERR: JSON PARSE ERROR", "err");
+                }
+            };
             
             wsSocket.onerror = function() { termLog("WS_ERROR: CONNECTION REFUSED", "err"); };
         }

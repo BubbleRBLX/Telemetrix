@@ -532,6 +532,9 @@
             if(element) { element.classList.add('bg-green-800', 'text-black'); }
 
             const target = globalRecords[index]; if(!target) return;
+            const heading = target.heading || 0; // Wenn heading fehlt, nimm 0
+            const dewPoint = target.dewPoint || 0;
+            const vaporPress = target.vaporPress || 0;
             let fixStr = target.fix ? `LOCKED` : `SEEKING`;
             
             document.getElementById('detailsCard').innerHTML = `

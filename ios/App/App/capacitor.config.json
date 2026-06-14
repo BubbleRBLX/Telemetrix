@@ -1,0 +1,8 @@
+{
+	"appId": "com.telemetrix.app",
+	"appName": "Telemetrix",
+	"webDir": "www",
+	"packageClassList": [
+		"FilesystemPlugin"
+	]
+}

@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TELEMETRIX // CORE LIVE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #050505; color: #16a34a; font-family: 'Courier New', Courier, monospace; }
+        .crt-border { border: 1px solid #15803d; box-shadow: 0 0 8px rgba(21, 128, 61, 0.2); }
+        .crt-text { text-shadow: 0 0 5px rgba(34, 197, 94, 0.5); }
+        .term-input { background: #000; color: #4ade80; border: 1px solid #166534; outline: none; }
+        .term-input:focus { border-color: #4ade80; box-shadow: 0 0 5px rgba(74, 222, 128, 0.5); }
+        .hover-invert:hover { background-color: #22c55e; color: #000; font-weight: bold; cursor: pointer; }
+        .blink { animation: blinker 1s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #000; border-left: 1px solid #15803d; }
+        ::-webkit-scrollbar-thumb { background: #15803d; }
+        ::-webkit-scrollbar-thumb:hover { background: #22c55e; }
+        .leaflet-container { background: #000 !important; }
+        .leaflet-popup-content-wrapper { background: #000; color: #4ade80; border: 1px solid #15803d; border-radius: 0; font-family: 'Courier New', Courier, monospace; }
+        .leaflet-popup-tip { background: #000; border: 1px solid #15803d; }
+    </style>
+</head>
+<body class="min-h-screen p-2 md:p-4 text-sm selection:bg-green-500 selection:text-black">
+
+    <div class="max-w-[1600px] mx-auto">
+        <header class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+            <div class="crt-border p-4 bg-black flex flex-col justify-between">
+                <div>
+                    <h1 class="text-2xl font-black tracking-widest text-green-500 crt-text">SYS.TELEMETRIX<span class="blink">_</span></h1>
+                    <p class="text-[10px] text-green-700 uppercase mt-1">Live WebSocket Uplink v3.1</p>
+                </div>
+                <div class="mt-4 flex flex-wrap gap-2 items-center">
+                    <!-- FIXED: Made editable + better default + placeholder -->
+                    <input type="text" id="ws-ip" value="192.168.1.XXX" 
+                        placeholder="192.168.1.XXX or telemetrix.local"
+                        class="term-input px-2 py-1 text-xs w-40 focus:w-52 transition-all" />
+                    
+                    <button onclick="connectLiveStream()" 
+                            class="hover-invert border border-green-700 px-3 py-1 text-xs uppercase font-bold">
+                        [ CONNECT ]
+                    </button>
+                    <button onclick="disconnectStream()" 
+                            class="hover-invert border border-red-700 px-3 py-1 text-xs uppercase text-red-500">
+                        [ DISCONNECT ]
+                    </button>
+                    <button onclick="dumpMemory()" 
+                            class="hover-invert border border-green-700 px-3 py-1 text-xs uppercase text-green-800" id="btn-dump">
+                        [ DUMP_MEM ]
+                    </button>
+                </div>
+                <div class="text-[9px] text-green-700 mt-2">
+                    💡 Use the ESP32's actual IP address (check Serial Monitor)
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 crt-border bg-black p-2 flex flex-col h-32 relative overflow-hidden">
+                <div class="text-[10px] bg-green-900/30 text-green-400 px-2 py-0.5 border-b border-green-800 uppercase flex justify-between">
+                    <span>> DATA_INTEGRITY_MATRIX</span>
+                    <span id="ws-status" class="text-red-500">OFFLINE</span>
+                </div>
+                <div id="terminal-out" class="text-[10px] mt-1 overflow-y-auto flex-1 leading-tight text-green-500 p-1">
+                    > INITIATING KERNEL... OK<br>
+                    > ENTER ESP32 IP ADDRESS TO BEGIN STREAM.<br>
+                </div>
+            </div>
+        </header>
+
+        <nav class="flex border-b border-green-800 mb-4 text-xs uppercase font-bold overflow-x-auto">
+            <button onclick="switchTab('tab-map')" id="nav-tab-map" class="px-4 py-2 hover-invert bg-green-900/40 border-t border-l border-r border-green-500 text-green-400 whitespace-nowrap">> MAP_SPACE</button>
+            <button onclick="switchTab('tab-charts')" id="nav-tab-charts" class="px-4 py-2 hover-invert text-green-700 border-b border-transparent whitespace-nowrap">> KINETIC_CHARTS</button>
+            <button onclick="switchTab('tab-physics')" id="nav-tab-physics" class="px-4 py-2 hover-invert text-green-700 border-b border-transparent whitespace-nowrap">> THERMODYNAMICS</button>
+            <button onclick="switchTab('tab-deep')" id="nav-tab-deep" class="px-4 py-2 hover-invert text-green-700 border-b border-transparent whitespace-nowrap">> DEEP_METRICS</button>
+        </nav>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <div class="crt-border bg-[#020802] p-2 flex justify-between items-center">
+                <div class="text-[9px] text-green-700 uppercase">Odometer [km]</div>
+                <div class="text-lg text-green-400 crt-text" id="statOdometer">0.00</div>
+            </div>
+            <div class="crt-border bg-[#020802] p-2 flex justify-between items-center">
+                <div class="text-[9px] text-green-700 uppercase">Max Temp [°C]</div>
+                <div class="text-lg text-green-400 crt-text" id="statMaxTemp">0.0</div>
+            </div>
+            <div class="crt-border bg-[#020802] p-2 flex justify-between items-center">
+                <div class="text-[9px] text-green-700 uppercase">Peak Heat Idx [°C]</div>
+                <div class="text-lg text-green-400 crt-text" id="statMaxHI">0.0</div>
+            </div>
+            <div class="crt-border bg-[#020802] p-2 flex justify-between items-center">
+                <div class="text-[9px] text-green-700 uppercase">Tether Rad [km]</div>
+                <div class="text-lg text-green-400 crt-text" id="statMaxTether">0.00</div>
+            </div>
+        </div>
+
+        <div id="tab-map" class="tab-content space-y-4">
+            <div class="crt-border bg-[#020802] p-2 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
+                <div class="flex flex-wrap gap-2 items-center">
+                    <span class="text-green-700 mr-2">> SET_LAYER:</span>
+                    <button onclick="changeRouteColorMode('default')" id="btn-default" class="border border-green-500 bg-green-900/30 text-green-300 px-2 py-1 hover-invert">[ DEF ]</button>
+                    <button onclick="changeRouteColorMode('temp')" id="btn-temp" class="border border-green-800 text-green-600 px-2 py-1 hover-invert">[ TMP ]</button>
+                    <button onclick="changeRouteColorMode('hum')" id="btn-hum" class="border border-green-800 text-green-600 px-2 py-1 hover-invert">[ HUM ]</button>
+                    <button onclick="changeRouteColorMode('speed')" id="btn-speed" class="border border-green-800 text-green-600 px-2 py-1 hover-invert">[ SPD ]</button>
+                    <button onclick="changeRouteColorMode('incline')" id="btn-incline" class="border border-green-800 text-green-600 px-2 py-1 hover-invert">[ INC ]</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                <div class="lg:col-span-3 crt-border bg-black h-[550px] relative p-1">
+                    <div id="map" class="w-full h-full z-0 filter contrast-125"></div>
+                </div>
+                
+                <div class="crt-border bg-black flex flex-col h-[550px]">
+                    <div class="bg-green-900/20 p-2 border-b border-green-800 text-[10px] uppercase text-green-400">> PACKET_INSPECTOR</div>
+                    <div id="detailsCard" class="p-3 text-[10px] border-b border-green-800 min-h-[180px]">
+                        <span class="text-green-800 blink">> AWAITING_STREAM...</span>
+                    </div>
+                    <div class="bg-green-900/20 p-1 border-b border-green-800 text-[10px] uppercase pl-2 text-green-600">> CHRONO_STREAM</div>
+                    <div id="timeline" class="flex-1 overflow-y-auto p-1 space-y-1 text-[10px]"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-charts" class="tab-content hidden space-y-4">
+            <div class="crt-border bg-[#020802] p-4">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-green-800 pb-3 mb-4 text-xs">
+                    <div class="uppercase text-green-500">> PLOT_MATRIX <span class="text-green-800">// 2D KINEMATICS</span></div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-green-700">> VECTOR:</label>
+                        <select id="chartMetricSelector" onchange="updateAnalyticsChart()" class="term-input p-1 text-[10px] uppercase cursor-pointer">
+                            <option value="speed">Velocity (KPH)</option>
+                            <option value="temp">Temp (C)</option>
+                            <option value="baroAlt">Baro Alt (M)</option>
+                            <option value="hum">Rel Humidity (%)</option>
+                            <option value="vaporPress">Vapor Pressure (hPa)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="h-[450px] w-full relative">
+                    <canvas id="primaryAnalyticsCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-physics" class="tab-content hidden space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="crt-border bg-[#020802] p-4 flex flex-col justify-between">
+                    <div class="flex justify-between items-center mb-2 border-b border-green-900 pb-1">
+                        <span class="text-[10px] uppercase text-green-600">> DEW_POINT_PROFILER</span>
+                        <span id="lensFogAlert" class="text-[9px] px-1 bg-green-900/50 text-green-700">NULL</span>
+                    </div>
+                    <div class="mt-4 flex justify-between items-end">
+                        <span class="text-[9px] text-green-800 uppercase">CURRENT</span>
+                        <span id="labDewPoint" class="text-xl text-green-400 crt-text">--</span>
+                    </div>
+                </div>
+
+                <div class="crt-border bg-[#020802] p-4 flex flex-col justify-between">
+                    <div class="flex justify-between items-center mb-2 border-b border-green-900 pb-1">
+                        <span class="text-[10px] uppercase text-green-600">> AIR_DENSITY_EST</span>
+                    </div>
+                    <div class="mt-4 flex justify-between items-end">
+                        <span class="text-[9px] text-green-800 uppercase">CURRENT</span>
+                        <span id="labAirDensity" class="text-xl text-green-400 crt-text">--</span>
+                    </div>
+                </div>
+
+                <div class="crt-border bg-[#020802] p-4 flex flex-col justify-between">
+                    <div class="flex justify-between items-center mb-2 border-b border-green-900 pb-1">
+                        <span class="text-[10px] uppercase text-green-600">> KINETIC_JERK_MAX</span>
+                    </div>
+                    <div class="mt-4 flex justify-between items-end">
+                        <span class="text-[9px] text-green-800 uppercase">PEAK_DETECTED</span>
+                        <span id="labMaxJerk" class="text-xl text-green-400 crt-text">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-deep" class="tab-content hidden space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="crt-border bg-black p-4">
+                    <h3 class="text-green-500 font-bold border-b border-green-800 pb-2 mb-4 uppercase">> ESOTERIC_AERODYNAMICS</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="text-[10px] text-green-700 mb-1">LOCAL WATER BOILING POINT (Based on Baro Alt)</div>
+                            <div class="text-lg text-green-400 font-mono" id="deepBoiling">-- °C</div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] text-green-700 mb-1">VAPOR PRESSURE (hPa)</div>
+                            <div class="flex items-center">
+                                <div class="text-lg text-green-400 font-mono w-24" id="deepVapor">--</div>
+                                <div class="flex-1 h-2 bg-green-900/30 overflow-hidden"><div id="barVapor" class="h-full bg-green-500 w-0"></div></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] text-green-700 mb-1">ABSOLUTE HUMIDITY (g/m³)</div>
+                            <div class="flex items-center">
+                                <div class="text-lg text-green-400 font-mono w-24" id="deepAbsHum">--</div>
+                                <div class="flex-1 h-2 bg-green-900/30 overflow-hidden"><div id="barAbsHum" class="h-full bg-green-500 w-0"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="crt-border bg-black p-4">
+                    <h3 class="text-green-500 font-bold border-b border-green-800 pb-2 mb-4 uppercase">> PLANETARY_GEODESICS</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="text-[10px] text-green-700 mb-1">CORIOLIS FORCE PARAMETER (f)</div>
+                            <div class="text-lg text-green-400 font-mono" id="deepCoriolis">--</div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] text-green-700 mb-1">DISTANCE TO EQUATOR</div>
+                            <div class="text-lg text-green-400 font-mono" id="deepEquator">-- km</div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] text-green-700 mb-1">MAX TOPOGRAPHIC INCLINE / GRADE</div>
+                            <div class="text-lg text-green-400 font-mono" id="deepIncline">-- %</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Init Map
+        const map = L.map('map', { zoomControl: false }).setView([20, 0], 2);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { 
+            attribution: '© OpenStreetMap, © CartoDB', maxZoom: 20
+        }).addTo(map);
+
+        import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+        
+        let pathSegmentsGroup = L.layerGroup().addTo(map);
+        let activeSelectionHighlight = null;
+        let startMarker, endMarker;
+        
+        let globalRecords = []; 
+        let activeColorMode = 'default';
+        let timeChartInstance = null;
+        let wsSocket = null;
+        let reconnectTimer = null;
+        let lastIpAddress = "";
+        let shouldReconnect = false;
+        // Cumulative State Variables
+        let cumulativeDistance = 0;
+        let originalLat = null;
+        let originalLng = null;
+        let maxTether = 0;
+
+        let stats = {
+            speed: { max: -Infinity, min: Infinity }, temp: { max: -Infinity, min: Infinity },
+            hum: { max: -Infinity, min: Infinity }, baroAlt: { max: -Infinity, min: Infinity },
+            hi: { max: -Infinity }, jerk: { max: -Infinity }, incline: { max: -Infinity }
+        };
+
+        // Auto-detect common local IPs on mobile (optional helper)
+        function suggestLocalIP() {
+            const ipInput = document.getElementById('ws-ip');
+            // Common gateway ranges
+            if (ipInput.value.includes('XXX')) {
+                termLog("Tip: Check Serial Monitor on ESP32 for its IP address", "warn");
+            }
+        }
+
+        function termLog(msg, type="info") {
+            const term = document.getElementById('terminal-out');
+            let color = type === "err" ? "text-red-500" : (type === "warn" ? "text-yellow-500" : "text-green-500");
+            term.innerHTML += `<span class="${color}">> ${msg}</span><br>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
+            
+            ['tab-map', 'tab-charts', 'tab-physics', 'tab-deep'].forEach(id => {
+                let btn = document.getElementById(`nav-${id}`);
+                btn.className = (id === tabId) 
+                    ? "px-4 py-2 hover-invert bg-green-900/40 border-t border-l border-r border-green-500 text-green-400 whitespace-nowrap"
+                    : "px-4 py-2 hover-invert text-green-700 border-b border-green-800 whitespace-nowrap";
+            });
+
+            if(tabId === 'tab-map') { setTimeout(() => { map.invalidateSize(); }, 200); }
+            if(tabId === 'tab-charts') { updateAnalyticsChart(); }
+        }
+
+        // --- MATH LIBRARY ---
+        function calcDewPoint(T, RH) { const a = 17.27, b = 237.7; let alpha = ((a * T) / (b + T)) + Math.log(RH / 100.0); return (b * alpha) / (a - alpha); }
+        function calcHeatIndex(T, RH) { if (T < 26.7) return T; return T + 0.5 * (T + 61.0 + ((T - 68.0) * 1.2) + (RH * 0.094)); }
+        function calcAirDensity(p_hpa, T_c) { return (p_hpa * 100) / (287.05 * (T_c + 273.15)); }
+        function calcVaporPressure(T, RH) { return 6.11 * Math.pow(10, (7.5 * T) / (237.3 + T)) * (RH / 100.0); }
+        function calcAbsoluteHumidity(T, RH) { let e = calcVaporPressure(T, RH); return (e * 100) / (461.5 * (T + 273.15)) * 1000; }
+        function calcBoilingPoint(alt_m) { return 100 - (alt_m / 285.0); }
+        function calcCoriolis(lat) { return 2 * 7.2921e-5 * Math.sin(lat * Math.PI / 180); }
+        function distToEquator(lat) { return Math.abs(lat) * 111.32; }
+
+        function haversine(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; let p1 = lat1 * Math.PI/180, p2 = lat2 * Math.PI/180;
+            let dp = (lat2-lat1) * Math.PI/180, dl = (lon2-lon1) * Math.PI/180;
+            let a = Math.sin(dp/2) * Math.sin(dp/2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dl/2) * Math.sin(dl/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        function scheduleReconnect()
+        {
+            clearTimeout(reconnectTimer);
+
+            reconnectTimer = setTimeout(() =>
+            {
+                if(
+                    shouldReconnect &&
+                    lastIpAddress &&
+                    (!wsSocket || wsSocket.readyState === WebSocket.CLOSED)
+                )
+                {
+                    termLog("AUTO-RECONNECT ATTEMPT.");
+                    connectLiveStream(lastIpAddress);
+                }
+            }, 3000);
+        }
+
+                // --- LIVE WEB SOCKET INTEGRATION ---
+        function disconnectStream() {
+            shouldReconnect = false; // Stop the auto-retry logic
+            if (wsSocket) {
+                wsSocket.onclose = null; // Prevent the retry logic from firing
+                wsSocket.close();
+                wsSocket = null;
+            }
+            document.getElementById('ws-status').innerText = "DISCONNECTED";
+            document.getElementById('ws-status').className = "text-red-500";
+            termLog("STREAM MANUALLY TERMINATED.");
+        }
+
+        // --- UPDATED CONNECTION FUNCTION ---
+        function connectLiveStream(forceIp = null) {
+            let ip = forceIp || document.getElementById('ws-ip').value.trim();
+    
+            if (!ip || ip.includes('XXX')) {
+                termLog("ERROR: Please enter the real ESP32 IP address (e.g. 192.168.1.45)", "err");
+                suggestLocalIP();
+                return;
+            }
+            
+            ip = ip.replace(/^ws:\/\//i, '').replace(/^wss:\/\//i, '').replace(/\/+$/, '');
+            lastIpAddress = ip;
+            shouldReconnect = true; // Enable auto-retry
+
+            if(wsSocket) { wsSocket.close(); }
+
+            termLog(`ATTEMPTING HANDSHAKE WITH ws://${ip}/ws...`);
+            wsSocket = new WebSocket(`ws://${ip}/ws`);
+
+            wsSocket.onopen = function() {
+                document.getElementById('ws-status').innerText = "ONLINE";
+                document.getElementById('ws-status').className = "text-green-500 blink";
+                termLog("HANDSHAKE SUCCESS.");
+            };
+
+            wsSocket.onclose = function(event) {
+                document.getElementById('ws-status').innerText = "OFFLINE";
+                document.getElementById('ws-status').className = "text-red-500";
+                
+                // Only trigger scheduleReconnect if we haven't manually disconnected
+                if (shouldReconnect) {
+                    termLog(`CONNECTION LOST (Code: ${event.code}). RETRYING...`, "warn");
+                    scheduleReconnect();
+                }
+            };
+
+            wsSocket.onmessage = function(event) {
+                console.log("DEBUG: Daten empfangen -> ", event.data); // Das zeigt dir in der Konsole, was ankommt
+                try {
+                    const record = JSON.parse(event.data);
+                    console.log("DEBUG: Parsen erfolgreich -> ", record); // Zeigt dir das JSON-Objekt
+                    processLiveRecord(record);
+                } catch(e) {
+                    console.error("DEBUG: PARSE FEHLER: ", e); // Zeigt dir genau, warum es nicht geht
+                    termLog("ERR: JSON PARSE ERROR", "err");
+                }
+            };
+            
+            wsSocket.onerror = function() { termLog("WS_ERROR: CONNECTION REFUSED", "err"); };
+        }
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === 'visible') {
+                if (!wsSocket || wsSocket.readyState !== WebSocket.OPEN) {
+                    connectLiveStream();
+                }
+            }
+        });
+
+        function processLiveRecord(r) {
+            let prev = globalRecords.length > 0 ? globalRecords[globalRecords.length-1] : null;
+            let dt = prev ? (r.uptime - prev.uptime) : 1; if(dt <= 0) dt = 1;
+
+            if(!originalLat && r.lat !== 0) { originalLat = r.lat; originalLng = r.lng; }
+
+            // Physics Derivations
+            r.dewPoint = calcDewPoint(r.temp, r.hum);
+            r.heatIndex = calcHeatIndex(r.temp, r.hum);
+            r.airDensity = calcAirDensity(r.press || 1013.25, r.temp);
+            r.vaporPress = calcVaporPressure(r.temp, r.hum);
+            r.absHum = calcAbsoluteHumidity(r.temp, r.hum);
+            r.boilingPt = calcBoilingPoint(r.baroAlt);
+            r.coriolis = calcCoriolis(r.lat) * 1e5; 
+            r.equatorDist = distToEquator(r.lat);
+            r.pace = (r.speed > 0.5) ? (60.0 / r.speed) : 0; 
+
+            if(prev) {
+                r.acc = ((r.speed - prev.speed) / 3.6) / dt; 
+                r.jerk = (r.acc - (prev.acc || 0)) / dt;
+                let distDelta = (r.lat !== 0 && prev.lat !== 0) ? haversine(prev.lat, prev.lng, r.lat, r.lng) : 0;
+                r.incline = (distDelta > 0) ? ((r.baroAlt - prev.baroAlt) / distDelta) * 100 : 0;
+                cumulativeDistance += distDelta;
+            } else { r.acc = 0; r.jerk = 0; r.incline = 0; }
+            
+            r.odometer = cumulativeDistance / 1000.0;
+            if(originalLat && r.lat !== 0) {
+                let currentTether = haversine(originalLat, originalLng, r.lat, r.lng) / 1000.0;
+                r.tether = currentTether;
+                if(currentTether > maxTether) maxTether = currentTether;
+            } else { r.tether = 0; }
+
+            // Update Stats
+            if (r.speed > stats.speed.max) stats.speed.max = r.speed; 
+            if (r.temp > stats.temp.max) stats.temp.max = r.temp; 
+            if (r.hum > stats.hum.max) stats.hum.max = r.hum; 
+            if (r.heatIndex > stats.hi.max) stats.hi.max = r.heatIndex;
+            if (Math.abs(r.jerk) > stats.jerk.max) stats.jerk.max = Math.abs(r.jerk);
+            if (Math.abs(r.incline) > stats.incline.max) stats.incline.max = Math.abs(r.incline);
+
+            globalRecords.push(r);
+            
+            // DOM Updates
+            document.getElementById('statOdometer').innerText = r.odometer.toFixed(2);
+            document.getElementById('statMaxTemp').innerText = stats.temp.max.toFixed(1);
+            document.getElementById('statMaxHI').innerText = stats.hi.max.toFixed(1);
+            document.getElementById('statMaxTether').innerText = maxTether.toFixed(2);
+
+            document.getElementById('labDewPoint').innerText = r.dewPoint.toFixed(1) + "C";
+            document.getElementById('labAirDensity').innerText = r.airDensity.toFixed(3) + "KG";
+            document.getElementById('labMaxJerk').innerText = stats.jerk.max.toFixed(2);
+            
+            let fogAlert = document.getElementById('lensFogAlert');
+            if(Math.abs(r.temp - r.dewPoint) <= 2.0) {
+                fogAlert.innerText = "WARN: CONDENSATION"; fogAlert.className = "text-[9px] px-1 bg-red-900 text-red-500 blink";
+            } else { fogAlert.innerText = "NOMINAL"; fogAlert.className = "text-[9px] px-1 bg-green-900 text-green-500"; }
+
+            document.getElementById('deepBoiling').innerText = r.boilingPt.toFixed(2) + " °C";
+            document.getElementById('deepVapor').innerText = r.vaporPress.toFixed(2);
+            document.getElementById('deepAbsHum').innerText = r.absHum.toFixed(2);
+            document.getElementById('barVapor').style.width = Math.min((r.vaporPress / 50) * 100, 100) + "%";
+            document.getElementById('barAbsHum').style.width = Math.min((r.absHum / 30) * 100, 100) + "%";
+            document.getElementById('deepCoriolis').innerText = r.coriolis.toFixed(4) + " × 10⁻⁵ /s";
+            document.getElementById('deepEquator').innerText = r.equatorDist.toFixed(1) + " km";
+            document.getElementById('deepIncline').innerText = stats.incline.max.toFixed(1) + " %";
+
+            // Update UI components
+            prependTimelineItem(r, globalRecords.length - 1);
+            inspectRecordSnapshot(globalRecords.length - 1); // Auto-inspect latest
+            
+            // Append line segment to map
+            if(prev && r.lat !== 0 && prev.lat !== 0) {
+                L.polyline([[prev.lat, prev.lng], [r.lat, r.lng]], { color: getSegmentColor(r), weight: 3, opacity: 0.8 }).addTo(pathSegmentsGroup);
+                map.panTo([r.lat, r.lng]);
+            }
+
+            // Update chart if visible
+            if(!document.getElementById('tab-charts').classList.contains('hidden')) { updateAnalyticsChart(); }
+        }
+
+        function getSegmentColor(rec) {
+            if (activeColorMode === 'default') return '#22c55e';
+            let min, max, fr;
+            if (activeColorMode === 'temp') { min = 10; max = 35; fr = Math.min(Math.max((rec.temp - min) / (max - min), 0), 1); return `rgb(${Math.round(34 + fr*221)}, ${Math.round(197 - fr*197)}, 0)`; }
+            if (activeColorMode === 'hum') { min = 20; max = 90; fr = Math.min(Math.max((rec.hum - min) / (max - min), 0), 1); return `rgb(0, ${Math.round(100 + fr*155)}, ${Math.round(255 - fr*100)})`; }
+            if (activeColorMode === 'speed') { min = 0; max = 10; fr = Math.min(Math.max((rec.speed - min) / (max - min), 0), 1); return `rgb(${Math.round(255 - fr*255)}, ${Math.round(fr*255)}, 0)`; }
+            if (activeColorMode === 'incline') { min = -10; max = 10; let clamp = Math.max(-10, Math.min(10, rec.incline)); fr = (clamp + 10) / 20; return `rgb(${Math.round(fr*255)}, 0, ${Math.round((1-fr)*255)})`; } 
+            return '#22c55e';
+        }
+
+        function changeRouteColorMode(mode) { 
+            activeColorMode = mode; 
+            ['default', 'temp', 'hum', 'speed', 'incline'].forEach(m => {
+                document.getElementById(`btn-${m}`).className = (m === mode) ? "border border-green-400 bg-green-500 text-black px-2 py-1 font-bold" : "border border-green-800 text-green-600 px-2 py-1 hover-invert";
+            });
+            // Re-render lines if mode changes
+            pathSegmentsGroup.clearLayers();
+            for(let i=1; i<globalRecords.length; i++) {
+                if(globalRecords[i].lat !== 0 && globalRecords[i-1].lat !== 0) {
+                    L.polyline([[globalRecords[i-1].lat, globalRecords[i-1].lng], [globalRecords[i].lat, globalRecords[i].lng]], { color: getSegmentColor(globalRecords[i]), weight: 3, opacity: 0.8 }).addTo(pathSegmentsGroup);
+                }
+            }
+        }
+
+        function prependTimelineItem(r, actIdx) {
+            const timelineDiv = document.getElementById('timeline');
+            const block = document.createElement('div');
+            let fixStr = r.fix ? `[3D]` : `[XX]`;
+            let colorClass = r.fix ? `text-green-500` : `text-red-500`;
+
+            block.className = "p-1.5 border-b border-green-900 cursor-pointer hover:bg-green-900/40 transition-colors timeline-item";
+            block.setAttribute('onclick', `inspectRecordSnapshot(${actIdx})`);
+            block.id = `timeline-node-${actIdx}`;
+            block.innerHTML = `
+                <div class="flex justify-between items-center ${colorClass}">
+                    <span>${fixStr} T+${r.uptime}s</span><span>${r.speed.toFixed(1)}kph</span>
+                </div>
+            `;
+            timelineDiv.prepend(block); // Add to top for live stream feel
+        }
+
+        function updateAnalyticsChart() {
+            if(globalRecords.length === 0) return;
+            const context = document.getElementById('primaryAnalyticsCanvas').getContext('2d');
+            const targetMetric = document.getElementById('chartMetricSelector').value;
+
+            // Cap array size so the browser doesn't freeze over long sessions
+            let renderRecords = globalRecords.slice(-100); 
+
+            let labels = renderRecords.map(r => `T+${r.uptime}`);
+            let dataPoints = renderRecords.map(r => r[targetMetric]);
+            
+            if(timeChartInstance) { timeChartInstance.destroy(); }
+
+            Chart.defaults.font.family = "'Courier New', Courier, monospace";
+            Chart.defaults.color = '#16a34a';
+
+            timeChartInstance = new Chart(context, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `// ${targetMetric.toUpperCase()} (LAST 100)`,
+                        data: dataPoints,
+                        borderColor: '#22c55e',
+                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                        borderWidth: 1.5,
+                        tension: 0, fill: true, pointRadius: 1
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: false,
+                    scales: {
+                        x: { grid: { color: '#064e3b' }, ticks: { maxRotation: 45 } },
+                        y: { grid: { color: '#064e3b' } }
+                    }
+                }
+            });
+        }
+
+        function inspectRecordSnapshot(index) {
+            document.querySelectorAll('.timeline-item').forEach(item => { item.classList.remove('bg-green-800', 'text-black'); });
+            let element = document.getElementById(`timeline-node-${index}`);
+            if(element) { element.classList.add('bg-green-800', 'text-black'); }
+
+            const target = globalRecords[index]; 
+            if(!target) return;
+
+            // --- SICHERHEITS-CHECK: Felder mit Fallback auf 0 ---
+            const fix = target.fix || 0;
+            const speed = target.speed || 0;
+            const heading = target.heading || 0;
+            const baroAlt = target.baroAlt || 0;
+            const temp = target.temp || 0;
+            const vaporPress = target.vaporPress || 0;
+            const dewPoint = target.dewPoint || 0;
+            
+            let fixStr = fix ? `LOCKED` : `SEEKING`;
+            
+            document.getElementById('detailsCard').innerHTML = `
+                <div class="flex justify-between border-b border-green-800 pb-1 mb-2 text-green-400">
+                    <span>> INDEX: 0x${index.toString(16).toUpperCase().padStart(4, '0')}</span>
+                    <span>T+${target.uptime || 0}s</span>
+                </div>
+                <div class="grid grid-cols-2 gap-y-1">
+                    <div>GPS_FIX: <span class="${fix ? 'text-green-500' : 'text-red-500 blink'}">${fixStr}</span></div>
+                    <div>BLE_SYS: <span>${target.ble || 'N/A'}</span></div>
+                    <div>VELOCITY: <span class="text-green-300">${speed.toFixed(1)}kph</span></div>
+                    <div>HEADING: <span>${heading.toFixed(0)}°</span></div>
+                    <div>B_ALT: <span class="text-green-300">${baroAlt.toFixed(1)}m</span></div>
+                    <div>TEMP: <span>${temp.toFixed(1)}°C</span></div>
+                    <div>VAPOR_P: <span>${vaporPress.toFixed(1)}hPa</span></div>
+                    <div>DEW_PT: <span>${dewPoint.toFixed(1)}°C</span></div>
+                </div>
+            `;
+
+            if(target.lat !== 0 && target.lng !== 0) {
+                if(activeSelectionHighlight) map.removeLayer(activeSelectionHighlight);
+                activeSelectionHighlight = L.circleMarker([target.lat, target.lng], { radius: 12, color: '#22c55e', weight: 1, fillColor: 'transparent' }).addTo(map);
+            }
+        }
+
+        async function saveSessionToFile(data) {
+            try {
+                const fileName = `session_${new Date().getTime()}.json`;
+                await Filesystem.writeFile({
+                path: fileName,
+                data: JSON.stringify(data),
+                directory: Directory.Documents,
+                encoding: Encoding.UTF8,
+                });
+                alert("Session gespeichert in: Documents/" + fileName);
+            } catch (e) {
+                console.error("Speichern fehlgeschlagen", e);
+            }
+        }
+
+        function dumpMemory() {
+            saveSessionToFile(globalRecords);
+        }
+    </script>
+</body>
+</html>

@@ -9,20 +9,43 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
-        body { background-color: #050505; color: #16a34a; font-family: 'Courier New', Courier, monospace; }
-        .crt-border { border: 1px solid #15803d; background: #000; box-shadow: 0 0 10px rgba(21, 128, 61, 0.3); }
+        body { 
+            background-color: #050505; 
+            color: #16a34a; 
+            font-family: 'Courier New', Courier, monospace; 
+        }
+        .crt-border { 
+            border: 1px solid #15803d; 
+            background: #000; 
+            box-shadow: 0 0 12px rgba(21, 128, 61, 0.4); 
+        }
         .crt-text { text-shadow: 0 0 6px rgba(34, 197, 94, 0.6); }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        canvas { width: 100% !important; height: 380px !important; }
-        .data-table { font-size: 0.8rem; }
+        .chart-container { 
+            position: relative; 
+            height: 420px; 
+            width: 100%; 
+        }
+        canvas { 
+            width: 100% !important; 
+            height: 100% !important; 
+        }
+        .stat-card {
+            transition: all 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.5);
+        }
+        table { font-size: 0.85rem; }
     </style>
 </head>
-<body class="p-4 min-h-screen">
+<body class="p-4 min-h-screen bg-[#020402]">
 <div class="max-w-7xl mx-auto">
     <header class="crt-border p-6 mb-6">
         <h1 class="text-4xl font-black text-green-500 crt-text uppercase tracking-tighter">TELEMETRIX ANALYZER_PRO</h1>
-        <p class="text-xs text-green-700 mt-1">// OFFLINE + ONLINE POST-PROCESSING ENGINE</p>
+        <p class="text-xs text-green-700 mt-1">// FULL OFFLINE ANALYSIS ENGINE v2.1</p>
         
         <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -31,104 +54,131 @@
                        class="w-full text-green-500 border border-green-800 p-3 bg-black cursor-pointer">
             </div>
             <div>
-                <label class="block text-green-600 text-xs mb-1">OR PASTE JSON ARRAY / RECORD</label>
-                <textarea id="jsonPaste" rows="3" placeholder='[{"uptime":..., ...}] or single record'
+                <label class="block text-green-600 text-xs mb-1">PASTE JSON ARRAY</label>
+                <textarea id="jsonPaste" rows="3" placeholder='[{"uptime":288,...}]'
                           class="w-full bg-black border border-green-800 p-3 text-green-400 font-mono text-xs"></textarea>
                 <button onclick="loadPastedJSON()" 
                         class="mt-2 px-6 py-2 bg-green-900 hover:bg-green-700 border border-green-500 text-green-300 text-sm">
-                        PROCESS PASTED DATA
+                        PROCESS DATA
                 </button>
             </div>
         </div>
     </header>
 
-    <nav class="flex gap-2 mb-6 border-b border-green-900 pb-3 overflow-x-auto">
+    <nav class="flex gap-2 mb-6 border-b border-green-900 pb-3 overflow-x-auto flex-wrap">
         <button onclick="showTab('tab-overview')" class="tab-btn active px-5 py-2 border border-green-700 hover:bg-green-900">OVERVIEW</button>
         <button onclick="showTab('tab-map')" class="tab-btn px-5 py-2 border border-green-700 hover:bg-green-900">MAP &amp; PATH</button>
         <button onclick="showTab('tab-kinetics')" class="tab-btn px-5 py-2 border border-green-700 hover:bg-green-900">KINETICS</button>
         <button onclick="showTab('tab-thermo')" class="tab-btn px-5 py-2 border border-green-700 hover:bg-green-900">THERMODYNAMICS</button>
         <button onclick="showTab('tab-geo')" class="tab-btn px-5 py-2 border border-green-700 hover:bg-green-900">GEODESICS</button>
-        <button onclick="showTab('tab-raw')" class="tab-btn px-5 py-2 border border-green-700 hover:bg-green-900">RAW DATA</button>
+        <button onclick="showTab('tab-raw')" class="tab-btn px-5 py-2 border border-green-700 hover:bg-green-900">RAW TABLE</button>
     </nav>
 
     <!-- OVERVIEW -->
     <div id="tab-overview" class="tab-content active space-y-6">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="statsGrid"></div>
-        <div class="crt-border p-4"><canvas id="chartSummary"></canvas></div>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4" id="statsGrid"></div>
+        <div class="crt-border p-4">
+            <div class="chart-container"><canvas id="chartSummary"></canvas></div>
+        </div>
     </div>
 
     <!-- MAP -->
     <div id="tab-map" class="tab-content">
-        <div id="map" class="crt-border h-[550px] w-full"></div>
-        <div class="mt-4 text-xs text-green-600">Path colored by speed (green → red)</div>
+        <div id="map" class="crt-border h-[620px] w-full rounded"></div>
+        <div class="mt-3 text-xs text-green-600 flex justify-between">
+            <span>Path colored by speed • Click tabs to refresh layout</span>
+        </div>
     </div>
 
     <!-- KINETICS -->
     <div id="tab-kinetics" class="tab-content space-y-6">
-        <div class="crt-border p-4"><canvas id="chartSpeed"></canvas></div>
-        <div class="crt-border p-4"><canvas id="chartJerk"></canvas></div>
+        <div class="crt-border p-4">
+            <div class="chart-container"><canvas id="chartSpeed"></canvas></div>
+        </div>
+        <div class="crt-border p-4">
+            <div class="chart-container"><canvas id="chartJerk"></canvas></div>
+        </div>
     </div>
 
     <!-- THERMODYNAMICS -->
     <div id="tab-thermo" class="tab-content space-y-6">
-        <div class="crt-border p-4"><canvas id="chartThermo"></canvas></div>
-        <div class="crt-border p-4"><canvas id="chartHumidity"></canvas></div>
+        <div class="crt-border p-4">
+            <div class="chart-container"><canvas id="chartThermo"></canvas></div>
+        </div>
+        <div class="crt-border p-4">
+            <div class="chart-container"><canvas id="chartHumidity"></canvas></div>
+        </div>
     </div>
 
     <!-- GEODESICS -->
     <div id="tab-geo" class="tab-content space-y-6">
-        <div class="crt-border p-4"><canvas id="chartAltitude"></canvas></div>
-        <div class="crt-border p-4"><canvas id="chartIncline"></canvas></div>
+        <div class="crt-border p-4">
+            <div class="chart-container"><canvas id="chartAltitude"></canvas></div>
+        </div>
+        <div class="crt-border p-4">
+            <div class="chart-container"><canvas id="chartIncline"></canvas></div>
+        </div>
     </div>
 
-    <!-- RAW DATA -->
+    <!-- RAW -->
     <div id="tab-raw" class="tab-content">
-        <div class="crt-border overflow-auto max-h-[70vh]">
-            <table class="data-table w-full" id="rawTable">
-                <thead><tr class="bg-green-950"><th class="p-2 text-left">Uptime</th><th>LAT</th><th>LNG</th><th>Speed</th><th>Temp</th><th>Hum</th><th>Press</th><th>BaroAlt</th></tr></thead>
-                <tbody></tbody>
+        <div class="crt-border overflow-auto max-h-[75vh]">
+            <table class="w-full text-xs" id="rawTable">
+                <thead class="bg-green-950 sticky top-0">
+                    <tr>
+                        <th class="p-3 text-left">Uptime</th>
+                        <th class="p-3 text-left">Lat</th>
+                        <th class="p-3 text-left">Lng</th>
+                        <th class="p-3 text-left">Speed</th>
+                        <th class="p-3 text-left">Temp</th>
+                        <th class="p-3 text-left">Hum</th>
+                        <th class="p-3 text-left">Press</th>
+                        <th class="p-3 text-left">BaroAlt</th>
+                    </tr>
+                </thead>
+                <tbody class="text-green-400"></tbody>
             </table>
         </div>
     </div>
 </div>
 
 <script>
-// ============== MATH HELPERS ==============
+// ============== MATH & HELPERS ==============
 function calcDewPoint(T, RH) {
     const a = 17.27, b = 237.7;
     let alpha = ((a * T) / (b + T)) + Math.log(RH / 100);
     return (b * alpha) / (a - alpha);
 }
-
-function calcVaporPressure(T, RH) { return 6.11 * Math.pow(10, (7.5 * T) / (237.3 + T)) * (RH / 100); }
+function calcVaporPressure(T, RH) { 
+    return 6.11 * Math.pow(10, (7.5 * T) / (237.3 + T)) * (RH / 100); 
+}
 function calcAbsoluteHumidity(T, RH) {
     let e = calcVaporPressure(T, RH);
     return (e * 100) / (461.5 * (T + 273.15)) * 1000;
 }
-
 function haversine(lat1, lon1, lat2, lon2) {
     const R = 6371000;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLon/2)**2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 // ============== GLOBALS ==============
-let map, polyline, globalData = [];
+let mapInstance = null;
+let polyline = null;
+let globalData = [];
 
-// ============== FILE / PASTE HANDLERS ==============
-document.getElementById('filePicker').addEventListener('change', function(e) {
+// ============== INPUT HANDLERS ==============
+document.getElementById('filePicker').addEventListener('change', e => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = function(ev) {
+    reader.onload = ev => {
         try {
             const parsed = JSON.parse(ev.target.result);
             processData(Array.isArray(parsed) ? parsed : [parsed]);
-        } catch(err) { alert("Invalid JSON"); }
+        } catch(err) { alert("Invalid JSON file"); }
     };
     reader.readAsText(file);
 });
@@ -146,11 +196,12 @@ function loadPastedJSON() {
 function processData(data) {
     globalData = data;
 
-    // Enrich data with derived metrics
     data.forEach((r, i) => {
-        if (!r.temp || isNaN(r.temp)) r.temp = 0;
-        if (!r.hum || isNaN(r.hum)) r.hum = 0;
-        if (!r.press) r.press = 1013.25;
+        r.temp = r.temp || 0;
+        r.hum = r.hum || 0;
+        r.press = r.press || 1013.25;
+        r.speed = r.speed || 0;
+        r.baroAlt = r.baroAlt || 0;
 
         r.dewPoint = calcDewPoint(r.temp, r.hum);
         r.vaporPress = calcVaporPressure(r.temp, r.hum);
@@ -159,23 +210,19 @@ function processData(data) {
 
         if (i > 0) {
             const prev = data[i-1];
-            const dt = (r.uptime - prev.uptime) || 1;
-            const dist = haversine(prev.lat || 0, prev.lng || 0, r.lat || 0, r.lng || 0);
-            
+            const dt = Math.max(r.uptime - prev.uptime, 1);
+            const dist = haversine(prev.lat||0, prev.lng||0, r.lat||0, r.lng||0);
             r.distDelta = dist;
-            r.incline = dist > 5 ? ((r.baroAlt - prev.baroAlt) / dist) * 100 : 0;
+            r.incline = dist > 8 ? ((r.baroAlt - prev.baroAlt) / dist) * 100 : 0;
             r.jerk = (r.speed - (prev.speed || 0)) / dt;
         } else {
-            r.distDelta = 0;
-            r.incline = 0;
-            r.jerk = 0;
+            r.distDelta = 0; r.incline = 0; r.jerk = 0;
         }
     });
 
     updateAllVisuals(data);
 }
 
-// ============== UPDATE ALL UI ==============
 function updateAllVisuals(data) {
     updateStats(data);
     updateMap(data);
@@ -184,109 +231,151 @@ function updateAllVisuals(data) {
     showTab('tab-overview');
 }
 
+// ============== STATS (Min / Avg / Max) ==============
 function updateStats(data) {
-    const totalDist = data.reduce((sum, r, i) => {
-        return i > 0 ? sum + (r.distDelta || 0) : sum;
-    }, 0) / 1000;
+    const totalDist = data.reduce((sum, r, i) => i > 0 ? sum + (r.distDelta || 0) : sum, 0) / 1000;
+    const speeds = data.map(r => r.speed || 0);
+    const temps = data.map(r => r.temp || 0);
+    const hums = data.map(r => r.hum || 0);
+    const alts = data.map(r => r.baroAlt || 0);
+    const inclines = data.map(r => Math.abs(r.incline || 0));
 
-    const avgSpeed = data.reduce((a, b) => a + (b.speed || 0), 0) / data.length;
-    const maxTemp = Math.max(...data.map(r => r.temp || 0));
-    const avgHum = data.reduce((a, b) => a + (b.hum || 0), 0) / data.length;
+    const avg = arr => arr.reduce((a,b)=>a+b,0)/arr.length;
+    const min = arr => Math.min(...arr);
+    const max = arr => Math.max(...arr);
 
     const html = `
-        <div class="crt-border p-5"><div class="text-green-600 text-xs">TOTAL DISTANCE</div><div class="text-4xl font-bold">${totalDist.toFixed(2)} km</div></div>
-        <div class="crt-border p-5"><div class="text-green-600 text-xs">AVG SPEED</div><div class="text-4xl font-bold">${avgSpeed.toFixed(1)} km/h</div></div>
-        <div class="crt-border p-5"><div class="text-green-600 text-xs">MAX TEMP</div><div class="text-4xl font-bold">${maxTemp.toFixed(1)} °C</div></div>
-        <div class="crt-border p-5"><div class="text-green-600 text-xs">AVG HUMIDITY</div><div class="text-4xl font-bold">${avgHum.toFixed(1)} %</div></div>
+        <div class="crt-border p-4 stat-card"><div class="text-[10px] text-green-600">TOTAL DISTANCE</div><div class="text-3xl font-bold">${totalDist.toFixed(2)} km</div></div>
+        
+        <div class="crt-border p-4 stat-card">
+            <div class="text-[10px] text-green-600">SPEED</div>
+            <div class="text-xl">Max: <span class="text-green-400">${max(speeds).toFixed(1)}</span></div>
+            <div class="text-xl">Avg: <span class="text-green-400">${avg(speeds).toFixed(1)}</span></div>
+            <div class="text-xl">Min: <span class="text-green-400">${min(speeds).toFixed(1)}</span></div>
+        </div>
+        
+        <div class="crt-border p-4 stat-card">
+            <div class="text-[10px] text-green-600">TEMPERATURE</div>
+            <div class="text-xl">Max: <span class="text-green-400">${max(temps).toFixed(1)}°C</span></div>
+            <div class="text-xl">Avg: <span class="text-green-400">${avg(temps).toFixed(1)}°C</span></div>
+            <div class="text-xl">Min: <span class="text-green-400">${min(temps).toFixed(1)}°C</span></div>
+        </div>
+        
+        <div class="crt-border p-4 stat-card">
+            <div class="text-[10px] text-green-600">HUMIDITY</div>
+            <div class="text-xl">Max: <span class="text-green-400">${max(hums).toFixed(1)}%</span></div>
+            <div class="text-xl">Avg: <span class="text-green-400">${avg(hums).toFixed(1)}%</span></div>
+            <div class="text-xl">Min: <span class="text-green-400">${min(hums).toFixed(1)}%</span></div>
+        </div>
+        
+        <div class="crt-border p-4 stat-card">
+            <div class="text-[10px] text-green-600">ALTITUDE</div>
+            <div class="text-xl">Max: <span class="text-green-400">${max(alts).toFixed(1)}m</span></div>
+            <div class="text-xl">Avg: <span class="text-green-400">${avg(alts).toFixed(1)}m</span></div>
+            <div class="text-xl">Min: <span class="text-green-400">${min(alts).toFixed(1)}m</span></div>
+        </div>
+        
+        <div class="crt-border p-4 stat-card">
+            <div class="text-[10px] text-green-600">INCLINE</div>
+            <div class="text-xl">Peak: <span class="text-green-400">${max(inclines).toFixed(1)}%</span></div>
+            <div class="text-xl">Avg: <span class="text-green-400">${avg(inclines).toFixed(1)}%</span></div>
+        </div>
     `;
     document.getElementById('statsGrid').innerHTML = html;
 }
 
+// ============== MAP ==============
 function updateMap(data) {
-    if (!map) {
-        map = L.map('map').setView([0, 0], 2);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-        polyline = L.polyline([], {color: '#22c55e', weight: 4}).addTo(map);
+    if (!mapInstance) {
+        mapInstance = L.map('map', { zoomControl: true }).setView([0, 0], 2);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(mapInstance);
+        polyline = L.polyline([], { color: '#22c55e', weight: 5, opacity: 0.85 }).addTo(mapInstance);
     }
 
-    const points = [];
-    data.forEach(r => {
-        if (r.lat && r.lat !== 0 && r.lng && r.lng !== 0) {
-            points.push([r.lat, r.lng]);
-        }
-    });
+    const points = data
+        .filter(r => r.lat && r.lat !== 0 && r.lng && r.lng !== 0)
+        .map(r => [r.lat, r.lng]);
 
     polyline.setLatLngs(points);
-    if (points.length > 0) map.fitBounds(points, {padding: [30, 30]});
+
+    if (points.length > 1) {
+        mapInstance.fitBounds(points, { padding: [40, 40] });
+    } else if (points.length === 1) {
+        mapInstance.setView(points[0], 16);
+    }
 }
 
+// ============== CHARTS ==============
 function updateCharts(data) {
-    const uptimeLabels = data.map(r => `T+${r.uptime}s`);
+    const labels = data.map(r => `T+${r.uptime}`);
 
-    // Summary chart
+    // Summary
     new Chart(document.getElementById('chartSummary'), {
         type: 'line',
         data: {
-            labels: uptimeLabels,
+            labels: labels,
             datasets: [
-                { label: 'Speed (km/h)', data: data.map(r => r.speed), borderColor: '#22c55e', tension: 0.2 },
-                { label: 'Temperature (°C)', data: data.map(r => r.temp), borderColor: '#eab308', tension: 0.2 }
+                { label: 'Speed km/h', data: data.map(r => r.speed), borderColor: '#22c55e', tension: 0.3 },
+                { label: 'Temp °C', data: data.map(r => r.temp), borderColor: '#eab308', tension: 0.3 }
             ]
         },
-        options: { responsive: true, plugins: { legend: { display: true } } }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } } }
     });
 
     // Speed
     new Chart(document.getElementById('chartSpeed'), {
         type: 'line',
-        data: { labels: uptimeLabels, datasets: [{ label: 'Speed', data: data.map(r => r.speed), borderColor: '#22c55e' }] },
-        options: { responsive: true }
+        data: { labels, datasets: [{ label: 'Speed (km/h)', data: data.map(r => r.speed), borderColor: '#22c55e' }] },
+        options: { responsive: true, maintainAspectRatio: false }
     });
 
     // Jerk
     new Chart(document.getElementById('chartJerk'), {
         type: 'line',
-        data: { labels: uptimeLabels, datasets: [{ label: 'Jerk', data: data.map(r => r.jerk), borderColor: '#ef4444' }] },
-        options: { responsive: true }
+        data: { labels, datasets: [{ label: 'Jerk', data: data.map(r => r.jerk), borderColor: '#ef4444' }] },
+        options: { responsive: true, maintainAspectRatio: false }
     });
 
     // Thermo
     new Chart(document.getElementById('chartThermo'), {
         type: 'line',
         data: {
-            labels: uptimeLabels,
+            labels,
             datasets: [
-                { label: 'Temp °C', data: data.map(r => r.temp), borderColor: '#eab308' },
-                { label: 'Dew Point', data: data.map(r => r.dewPoint), borderColor: '#3b82f6' }
+                { label: 'Temperature °C', data: data.map(r => r.temp), borderColor: '#eab308' },
+                { label: 'Dew Point °C', data: data.map(r => r.dewPoint), borderColor: '#3b82f6' }
             ]
         },
-        options: { responsive: true }
+        options: { responsive: true, maintainAspectRatio: false }
     });
 
     // Humidity
     new Chart(document.getElementById('chartHumidity'), {
         type: 'line',
         data: {
-            labels: uptimeLabels,
+            labels,
             datasets: [
-                { label: 'Humidity %', data: data.map(r => r.hum), borderColor: '#8b5cf6' },
-                { label: 'Abs Hum g/m³', data: data.map(r => r.absHum), borderColor: '#ec4899' }
+                { label: 'Rel. Humidity %', data: data.map(r => r.hum), borderColor: '#8b5cf6' },
+                { label: 'Abs. Humidity g/m³', data: data.map(r => r.absHum), borderColor: '#ec4899' }
             ]
         },
-        options: { responsive: true }
+        options: { responsive: true, maintainAspectRatio: false }
     });
 
-    // Altitude & Incline
+    // Altitude
     new Chart(document.getElementById('chartAltitude'), {
         type: 'line',
-        data: { labels: uptimeLabels, datasets: [{ label: 'Baro Altitude (m)', data: data.map(r => r.baroAlt), borderColor: '#14b8a6' }] },
-        options: { responsive: true }
+        data: { labels, datasets: [{ label: 'Barometric Altitude (m)', data: data.map(r => r.baroAlt), borderColor: '#14b8a6' }] },
+        options: { responsive: true, maintainAspectRatio: false }
     });
 
+    // Incline
     new Chart(document.getElementById('chartIncline'), {
         type: 'line',
-        data: { labels: uptimeLabels, datasets: [{ label: 'Incline %', data: data.map(r => r.incline), borderColor: '#f97316' }] },
-        options: { responsive: true }
+        data: { labels, datasets: [{ label: 'Incline %', data: data.map(r => r.incline), borderColor: '#f97316' }] },
+        options: { responsive: true, maintainAspectRatio: false }
     });
 }
 
@@ -295,16 +384,16 @@ function updateRawTable(data) {
     tbody.innerHTML = '';
     data.forEach(r => {
         const tr = document.createElement('tr');
-        tr.className = "border-b border-green-900 hover:bg-green-950";
+        tr.className = "border-b border-green-900 hover:bg-green-950/50";
         tr.innerHTML = `
-            <td class="p-2">${r.uptime}</td>
-            <td class="p-2">${r.lat?.toFixed(6) || 0}</td>
-            <td class="p-2">${r.lng?.toFixed(6) || 0}</td>
-            <td class="p-2">${r.speed?.toFixed(1) || 0}</td>
-            <td class="p-2">${r.temp?.toFixed(2) || 0}</td>
-            <td class="p-2">${r.hum?.toFixed(1) || 0}</td>
-            <td class="p-2">${r.press?.toFixed(2) || 0}</td>
-            <td class="p-2">${r.baroAlt?.toFixed(1) || 0}</td>
+            <td class="p-3">${r.uptime}</td>
+            <td class="p-3">${(r.lat||0).toFixed(6)}</td>
+            <td class="p-3">${(r.lng||0).toFixed(6)}</td>
+            <td class="p-3">${(r.speed||0).toFixed(1)}</td>
+            <td class="p-3">${(r.temp||0).toFixed(2)}</td>
+            <td class="p-3">${(r.hum||0).toFixed(1)}</td>
+            <td class="p-3">${(r.press||0).toFixed(2)}</td>
+            <td class="p-3">${(r.baroAlt||0).toFixed(1)}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -313,16 +402,21 @@ function updateRawTable(data) {
 function showTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
-    
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active', 'bg-green-900'));
-    const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => 
-        btn.getAttribute('onclick').includes(tabId)
-    );
-    if (activeBtn) activeBtn.classList.add('active', 'bg-green-900');
+
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('bg-green-900'));
+    const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+    if (activeBtn) activeBtn.classList.add('bg-green-900');
+
+    // Fix map size when switching to map tab
+    if (tabId === 'tab-map' && mapInstance) {
+        setTimeout(() => mapInstance.invalidateSize(), 100);
+    }
 }
 
-// Auto-load example if needed
-// processData([ {uptime:288, fix:0, lat:0, lng:0, speed:0, temp:26.26, hum:50.44, press:994.38, baroAlt:158.33, ble:"AP_LIVE"} ]);
+// Keyboard support & initial message
+document.addEventListener('keydown', e => {
+    if (e.key === "Escape") document.getElementById('jsonPaste').value = '';
+});
 </script>
 </body>
 </html>
